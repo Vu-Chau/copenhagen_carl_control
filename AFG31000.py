@@ -36,7 +36,7 @@ class AFG31000:
         return self.scope.query('*IDN?')
     def check_device_id(self):
         """Check if the device ID matches the expected value."""
-        expected_id = 'AFG31000'
+        expected_id = 'AFG31252'
         device_id = self.device_id()
         if expected_id not in device_id:
             raise ValueError(f"Device ID mismatch: expected '{expected_id}', got '{device_id}'")
