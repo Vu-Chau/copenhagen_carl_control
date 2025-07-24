@@ -3,35 +3,84 @@ API Reference
 
 This section provides detailed API documentation for all classes and methods.
 
-AFG31000 Class
+Complete API Documentation
+--------------------------
+
+For detailed documentation of each class and its methods, see:
+
+* :doc:`afg31000` - AFG31000 Function Generator API
+* :doc:`mso44b` - MSO44B Oscilloscope API
+
+Method Summary
 --------------
 
-.. autoclass:: AFG31000.AFG31000
-   :members:
-   :undoc-members:
-   :show-inheritance:
+**AFG31000 Function Generator Methods:**
 
-   .. automethod:: __init__
+Core Methods:
+  * ``__init__(resource_name, serial_port, ip_address, visa_address, timeout)`` - Initialize connection
+  * ``device_id()`` - Get device identification string  
+  * ``check_device_id(strict)`` - Verify device is AFG31000 series
+  * ``close()`` - Close connection and cleanup resources
 
-MSO44B Class  
-------------
+Waveform Configuration:
+  * ``set_waveform_type(channel, waveform_type)`` - Set waveform (SINusoid, SQUare, etc.)
+  * ``get_waveform_type(channel)`` - Get current waveform type
+  * ``set_frequency(channel, frequency)`` - Set frequency in Hz
+  * ``get_frequency(channel)`` - Get current frequency
+  * ``set_amplitude(channel, amplitude)`` - Set amplitude in Vpp
+  * ``get_amplitude(channel)`` - Get current amplitude
+  * ``set_offset(channel, offset)`` - Set DC offset in volts
+  * ``get_offset(channel)`` - Get current offset
 
-.. autoclass:: MSO44B.MSO44B
-   :members:
-   :undoc-members:
-   :show-inheritance:
+Output Control:
+  * ``set_output(channel, state)`` - Enable/disable output ('ON'/'OFF' or True/False)
+  * ``get_output(channel)`` - Get output state
+  * ``set_load(channel, impedance)`` - Set load impedance (50, 'INF', 'HIGHZ')
+  * ``get_load(channel)`` - Get load impedance
 
-   .. automethod:: __init__
+Advanced Features:
+  * ``set_phase(channel, phase, unit)`` - Set phase (degrees or radians)
+  * ``get_phase(channel, unit)`` - Get current phase
+  * ``set_frequency_lock(state)`` - Lock frequencies between channels
+  * ``get_frequency_lock()`` - Get frequency lock state
 
-MSO44BLegacy Class
-------------------
+Communication:
+  * ``write(command)`` - Send SCPI command
+  * ``read()`` - Read response
+  * ``query(command)`` - Send command and read response
+  * ``list_all_instruments()`` - Find all AFG instruments (static method)
 
-.. autoclass:: MSO44B.MSO44BLegacy
-   :members:
-   :undoc-members:
-   :show-inheritance:
+**MSO44B Oscilloscope Methods:**
 
-   .. automethod:: __init__
+Core Methods:
+  * ``__init__(timeout)`` - Initialize oscilloscope wrapper
+  * ``connect(ip_address, auto_discover)`` - Connect to oscilloscope
+  * ``setup_trigger(source_channel, trigger_type, level, slope)`` - Configure trigger
+  * ``disconnect()`` - Close connection
+  * ``__enter__()`` / ``__exit__()`` - Context manager support
+
+Data Acquisition:
+  * ``capture_waveforms(channels, filename, plot, save_csv)`` - Capture and process waveforms
+  * ``read_channel_waveform(channel, use_binary)`` - Read single channel data
+  * ``get_waveform_scaling_params(channel)`` - Get voltage scaling parameters
+  * ``get_time_scaling_params()`` - Get time base parameters
+  * ``convert_raw_to_voltage(raw_data, scaling_params)`` - Convert ADC to voltage
+  * ``generate_time_axis(data_length, time_params)`` - Create time axis
+
+Data Export:
+  * ``save_csv(waveform_data, filename)`` - Save data to CSV file
+  * ``plot_waveforms(waveform_data, channels, filename)`` - Generate plots
+
+Utility:
+  * ``list_all_instruments()`` - Find all MSO44/MSO46 instruments (static method)
+
+**MSO44BLegacy Basic Interface:**
+
+  * ``__init__(resource_name, ip_address, serial_port)`` - Initialize basic connection
+  * ``write(command)`` - Send SCPI command
+  * ``query(command)`` - Send command and read response  
+  * ``device_id()`` - Get device identification
+  * ``close()`` - Close connection
 
 Exception Handling
 ------------------
