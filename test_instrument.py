@@ -1,333 +1,189 @@
 from AFG31000 import AFG31000
-from MSO44B import SimpleMSO44B
+from MSO44B import MSO44B
 from matplotlib import pyplot as plt
 import numpy as np
-from pyMSO4 import * # Use pyMSO4 library https://github.com/ceres-c/pyMSO4
-class InstrumentTestExperiment:
-    """A class to manage the AFG31000 and MSO44B instruments for testing purposes."""
-    def __init__(self, afg_address, scope_address):
-        self.afg = None
-        self.scope = None 
-    def afg_setup(self):
-        """Set up the AFG31000 instrument.
-        Enable output on channel 1, disable on channel 2, and set frequency to 100 kHz.
-        Waveform type is set to RAMP, amplitude to 1 Vpp, and offset to 0 V.
-        Phase is set to 90 degrees.
-        The AFG31000 is reset before configuration.
-        """
-        # self.afg.reset()
-        self.afg.set_output(1, 'OFF')  # Disable output on channel 1
-        self.afg.set_output(2, 'OFF')
-        self.afg.set_frequency(1, 100e3)  # 100 kHz
-        self.afg.set_waveform(1, 'RAMP')
-        self.afg.set_amplitude(1, 1.0)  # 1 Vpp
-        self.afg.set_offset(1, 0.0)
-        self.afg.set_phase(1, 90, 'DEG')  # Set phase to 90 degrees
-        self.afg.set_output(1, 'ON')
+from pyMSO4 import *
 
-def scope_setup():
-    """Set up the MSO44B instrument.
-    Using pyMSO4 library to configure the MSO44B.
-    """
-    scope = MSO4(trig_type=MSO4EdgeTrigger)  
-    scope.con(ip="172.20.3.169") # TODO have a wrapper to automatically find the scope
-    scope.trigger.source = 'ch2'  # Set trigger source to channel 2
 
-    scope.ch_a_enable([True,True,True,False])  # Enable all channels
-    channels = ['ch1', 'ch2','ch3']
-    scope.acq.wfm_src = channels
-    scope.acq.wfm_start = 0
-    scope.acq.wfm_stop = 1000
+class InstrumentExamples:
+    """Examples demonstrating how to use the AFG31000 and MSO44B drivers."""
     
-    # Create subplot for multiple channels
-    fig, axes = plt.subplots(len(channels), 1, figsize=(10, 8), sharex=True)
-    if len(channels) == 1:
-        axes = [axes]  # Make it iterable for single channel
-    # Get waveform data for each channel
-    for i, channel in enumerate(channels):  # Fixed missing colon
-        scope.acq.wfm_src = [channel]  # Set single channel
-        wfm = scope.sc.query_binary_values('CURVE?', datatype=scope.acq.get_datatype(), is_big_endian=scope.acq.is_big_endian)
-
-        wfm_array = np.array(wfm)
-        print(f"{channel} - Length: {len(wfm)}, Shape: {wfm_array.shape}, Type: {wfm_array.dtype}")
-        print(f"{channel} - Min: {wfm_array.min():.4f}V, Max: {wfm_array.max():.4f}V")
-        
-        # Create time axis (assuming uniform sampling)
-        time_axis = np.linspace(0, len(wfm_array)/1e6, len(wfm_array))  # Assuming 1MHz sampling
-        
-        # Plot waveform
-        axes[i].plot(time_axis, wfm_array, label=channel)
-        axes[i].set_ylabel(f'{channel} (V)')
-        axes[i].grid(True, alpha=0.3)
-        axes[i].legend()
-        
-        # Add statistics text
-        mean_val = np.mean(wfm_array)
-        std_val = np.std(wfm_array)
-        axes[i].text(0.02, 0.95, f'Mean: {mean_val:.3f}V\nStd: {std_val:.3f}V', 
-                    transform=axes[i].transAxes, verticalalignment='top',
-                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-    
-    axes[-1].set_xlabel('Time (s)')
-    plt.suptitle('Oscilloscope Waveform Data')
-    plt.tight_layout()
-    plt.show()
-        
-
-
-def AFGTestManual():
-
-    """Main function to run the instrument test experiment."""
-    resource_name = "USB0::0x0699::0x035E::C019451::INSTR"  # Update this
-    afg = AFG31000()
-    """Set up the AFG31000 instrument.
-    Enable output on channel 1, disable on channel 2, and set frequency to 100 kHz.
-    Waveform type is set to RAMP, amplitude to 1 Vpp, and offset to 0 V.
-    Phase is set to 90 degrees.
-    The AFG31000 is reset before configuration.
-    """
-    # afg.reset()
-    afg.set_output(1, 'OFF')  # Disable output on channel 1
-    afg.set_output(2, 'OFF')
-    afg.set_frequency(1, 100e3)  # 100 kHz
-    afg.set_waveform_type(1, 'RAMP')
-    afg.set_amplitude(1, 1.0)  # 1 Vpp
-    afg.set_offset(1, 0.0)
-    afg.set_phase(1, 90, 'DEG')  # Set phase to 90 degrees
-    afg.set_output(1, 'OFF')
-
-    print("AFG31000 setup complete.")
-    # while True:
-    #     pass  # Keep the script running to maintain the AFG31000 state
-    
-def simple_mso44b_test():
-    """Test the SimpleMSO44B wrapper for easy waveform capture."""
-    print("=== SimpleMSO44B Wrapper Test ===\n")
-    
-    with SimpleMSO44B() as scope:
-        # Auto-connect to scope
-        if not scope.connect():
-            print("Failed to connect to MSO44B. Please check connection.")
-            return
-        
-        # Setup trigger on channel 1, rising edge at 0.5V
-        scope.setup_trigger(source_channel=1, level=0.5, slope='rising')
-        
-        # Capture waveforms from multiple channels
-        print("Starting capture (waiting for trigger)...")
-        results = scope.capture_waveforms(
-            channels=[1, 2, 3], 
-            filename="test_capture",
-            plot=True, 
-            save_csv=True
-        )
-        
-        if results:
-            print(f"\nCapture successful!")
-            print(f"- Captured {results['sample_points']} points")
-            print(f"- Channels: {results['channels']}")
-            print(f"- CSV file: {results.get('csv_file', 'Not saved')}")
-            print(f"- Plot file: {results.get('plot_file', 'Not saved')}")
-            
-            # Show some basic statistics
-            waveforms = results['waveforms']
-            for ch in results['channels']:
-                ch_key = f'CH{ch}'
-                if ch_key in waveforms:
-                    data = np.array(waveforms[ch_key])
-                    print(f"- {ch_key}: Mean={np.mean(data):.3f}V, Std={np.std(data):.3f}V")
-
-def combined_test():
-    """Combined test of AFG31000 and SimpleMSO44B for complete workflow."""
-    print("=== Combined AFG31000 + SimpleMSO44B Test ===\n")
-    
-    afg = None
-    try:
-        # Setup AFG31000
-        print("Setting up AFG31000...")
+    def __init__(self):
+        pass 
+    def afg_basic_example(self):
+        """Example: Basic AFG31000 configuration."""
+        print("=== AFG31000 Basic Configuration Example ===")
         afg = AFG31000()
         afg.set_output(1, 'OFF')
-        afg.set_output(2, 'OFF')
-        afg.set_frequency(1, 1000)  # 1 kHz for easy triggering
-        afg.set_waveform_type(1, 'SQUare')
-        afg.set_amplitude(1, 2.0)  # 2 Vpp
+        afg.set_output(2, 'OFF') 
+        afg.set_frequency(1, 100e3)  # 100 kHz
+        afg.set_waveform_type(1, 'RAMP')
+        afg.set_amplitude(1, 1.0)  # 1 Vpp
         afg.set_offset(1, 0.0)
+        afg.set_phase(1, 90, 'DEG')
         afg.set_output(1, 'ON')
-        print("AFG31000 generating 1kHz square wave, 2Vpp")
+        print("AFG configured: 100kHz ramp, 1Vpp, 90° phase")
+        afg.close()
+    
+    def mso_raw_pyMSO4_example(self):
+        """Example: Raw pyMSO4 usage for comparison."""
+        print("=== Raw pyMSO4 Example ===")
+        scope = MSO4(trig_type=MSO4EdgeTrigger)
+        scope.con(ip="172.20.3.169")
+        scope.trigger.source = 'ch2'
+        scope.ch_a_enable([True, True, True, False])
         
-        # Use SimpleMSO44B to capture
-        with SimpleMSO44B() as scope:
-            if scope.connect():
-                # Setup trigger for the AFG signal
-                scope.setup_trigger(source_channel=2, level=0.5, slope='rising')
-                
-                # Capture the generated waveform
-                results = scope.capture_waveforms(
-                    channels=[1,2,3], 
-                    filename="afg_test_capture",
-                    plot=True,
-                    save_csv=True
-                )
-                
-                if results:
-                    print("Successfully captured AFG-generated waveform!")
+        channels = ['ch1', 'ch2', 'ch3']
+        scope.acq.wfm_src = channels
+        scope.acq.wfm_start = 0
+        scope.acq.wfm_stop = 1000
         
-    except Exception as e:
-        print(f"Combined test failed: {e}")
-    finally:
-        # Safely turn off AFG
-        if afg:
-            try:
-                afg.set_output(1, 'OFF')
-                afg.close()
-                print("AFG31000 turned off and closed.")
-            except Exception as e:
-                print(f"Warning: Failed to properly close AFG: {e}")
-        print("Test complete.")
+        fig, axes = plt.subplots(len(channels), 1, figsize=(10, 8), sharex=True)
+        if len(channels) == 1: axes = [axes]
+        
+        for i, channel in enumerate(channels):
+            scope.acq.wfm_src = [channel]
+            wfm = scope.sc.query_binary_values('CURVE?', datatype=scope.acq.get_datatype(), 
+                                             is_big_endian=scope.acq.is_big_endian)
+            wfm_array = np.array(wfm)
+            time_axis = np.linspace(0, len(wfm_array)/1e6, len(wfm_array))
+            
+            axes[i].plot(time_axis, wfm_array, label=channel)
+            axes[i].set_ylabel(f'{channel} (V)')
+            axes[i].grid(True, alpha=0.3)
+            
+        axes[-1].set_xlabel('Time (s)')
+        plt.suptitle('Raw pyMSO4 Capture')
+        plt.tight_layout()
+        plt.show()
+        scope.dis()
+    
+    def mso_simple_wrapper_example(self):
+        """Example: MSO44B wrapper usage."""
+        print("=== MSO44B Wrapper Example ===")
+        with MSO44B() as scope:
+            if not scope.connect():
+                print("Failed to connect")
+                return
+            scope.setup_trigger(source_channel=1, level=0.5, slope='rising')
+            results = scope.capture_waveforms(channels=[1, 2, 3], filename="example_capture")
+            if results:
+                print(f"Captured {results['sample_points']} points from {results['channels']}")
+                for ch in results['channels']:
+                    data = np.array(results['waveforms'][f'CH{ch}'])
+                    print(f"CH{ch}: Mean={np.mean(data):.3f}V, Std={np.std(data):.3f}V")
 
-def instrument_discovery_test():
-    """Test instrument discovery capabilities."""
-    print("=== Instrument Discovery Test ===\n")
-    
-    print("1. Discovering all instruments:")
-    all_instruments = SimpleMSO44B.list_all_instruments()
-    
-    print("\n2. Discovering MSO44/46 instruments specifically:")
-    scope = SimpleMSO44B()
-    mso_instruments = scope._discover_mso44_instruments()
-    
-    if mso_instruments:
-        print(f"\nFound {len(mso_instruments)} MSO44/46 instrument(s) ready for connection.")
-        
-        # Test connection to first discovered instrument
-        print("\n3. Testing connection to first discovered MSO44/46...")
-        if scope.connect():
-            print("✓ Connection successful!")
+    def combined_afg_mso_example(self):
+        """Example: Combined AFG31000 + MSO44B workflow."""
+        print("=== Combined AFG + MSO Example ===")
+        afg = None
+        try:
+            afg = AFG31000()
+            afg.set_output(1, 'OFF')
+            afg.set_frequency(1, 1000)  # 1 kHz
+            afg.set_waveform_type(1, 'SQUare')
+            afg.set_amplitude(1, 2.0)  # 2 Vpp
+            afg.set_output(1, 'ON')
+            print("AFG: 1kHz square wave, 2Vpp")
+            
+            with MSO44B() as scope:
+                if scope.connect():
+                    scope.setup_trigger(source_channel=2, level=0.5, slope='rising')
+                    results = scope.capture_waveforms(channels=[1,2,3], filename="combined_capture")
+                    if results:
+                        print("Successfully captured AFG signal!")
+        except Exception as e:
+            print(f"Error: {e}")
+        finally:
+            if afg:
+                try:
+                    afg.set_output(1, 'OFF')
+                    afg.close()
+                except: pass
+
+    def instrument_discovery_example(self):
+        """Example: Instrument discovery and connection."""
+        print("=== Instrument Discovery Example ===")
+        MSO44B.list_all_instruments()
+        scope = MSO44B()
+        mso_instruments = scope._discover_mso44_instruments()
+        if mso_instruments and scope.connect():
+            print("✓ Auto-discovery and connection successful!")
             scope.disconnect()
         else:
-            print("✗ Connection failed.")
-    else:
-        print("\nNo MSO44/46 instruments found for connection test.")
+            print("✗ No MSO44/46 found or connection failed")
 
-def reusable_methods_test():
-    """Test the new reusable voltage conversion and waveform reading methods."""
-    print("=== Reusable Methods Test ===\n")
-    
-    with SimpleMSO44B() as scope:
-        if not scope.connect():
-            print("Failed to connect to MSO44B.")
-            return
-        
-        # Setup a simple trigger
-        scope.setup_trigger(source_channel=1, level=0.0, slope='rising')
-        
-        # Test individual channel reading
-        print("Testing individual channel waveform reading...")
-        try:
-            waveform_result = scope.read_channel_waveform(1)
-            
-            print(f"Raw data points: {len(waveform_result['raw_data'])}")
-            print(f"Voltage data points: {len(waveform_result['voltage_data'])}")
-            print(f"Sample raw values: {waveform_result['raw_data'][:5]}")
-            print(f"Sample voltage values: {waveform_result['voltage_data'][:5]}")
-            print(f"Scaling parameters: {waveform_result['scaling_params']}")
-            
-            # Test time axis generation
-            time_params = scope.get_time_scaling_params()
-            time_axis = scope.generate_time_axis(len(waveform_result['voltage_data']), time_params)
-            print(f"Time axis range: {time_axis[0]:.6e}s to {time_axis[-1]:.6e}s")
-            print(f"Time parameters: {time_params}")
-            
-        except Exception as e:
-            print(f"Method test failed: {e}")
-        
-        print("\nReusable methods test complete!")
+    def reusable_methods_example(self):
+        """Example: Using individual reusable methods."""
+        print("=== Reusable Methods Example ===")
+        with MSO44B() as scope:
+            if not scope.connect(): return
+            scope.setup_trigger(source_channel=1, level=0.0, slope='rising')
+            try:
+                result = scope.read_channel_waveform(1)
+                print(f"Raw points: {len(result['raw_data'])}")
+                print(f"Voltage points: {len(result['voltage_data'])}")
+                print(f"Sample voltages: {result['voltage_data'][:3]}")
+                
+                time_params = scope.get_time_scaling_params()
+                time_axis = scope.generate_time_axis(len(result['voltage_data']), time_params)
+                print(f"Time range: {time_axis[0]:.2e}s to {time_axis[-1]:.2e}s")
+            except Exception as e:
+                print(f"Error: {e}")
 
-def ascii_vs_binary_test():
-    """Compare ASCII vs binary data format accuracy."""
-    print("=== ASCII vs Binary Accuracy Test ===\n")
-    
-    with SimpleMSO44B() as scope:
-        if not scope.connect():
-            print("Failed to connect to MSO44B.")
-            return
-        
-        # Setup trigger
-        scope.setup_trigger(source_channel=1, level=0.0, slope='rising')
-        
-        try:
-            print("Reading waveform in ASCII format...")
-            ascii_result = scope.read_channel_waveform(1, use_binary=False)
-            
-            print("Reading waveform in binary format...")
-            binary_result = scope.read_channel_waveform(1, use_binary=True)
-            
-            # Compare the results
-            ascii_raw = ascii_result['raw_data'][:10]
-            binary_raw = binary_result['raw_data'][:10]
-            ascii_volt = ascii_result['voltage_data'][:10]
-            binary_volt = binary_result['voltage_data'][:10]
-            
-            print(f"\nFirst 10 raw values:")
-            print(f"ASCII:  {ascii_raw}")
-            print(f"Binary: {binary_raw}")
-            
-            print(f"\nFirst 10 voltage values:")
-            print(f"ASCII:  {ascii_volt}")
-            print(f"Binary: {binary_volt}")
-            
-            # Calculate differences
-            if len(ascii_volt) == len(binary_volt):
-                differences = [abs(a - b) for a, b in zip(ascii_volt, binary_volt)]
-                max_diff = max(differences[:10]) if differences else 0
-                avg_diff = sum(differences[:10]) / len(differences[:10]) if differences else 0
+    def ascii_vs_binary_example(self):
+        """Example: Compare ASCII vs binary data accuracy."""
+        print("=== ASCII vs Binary Comparison Example ===")
+        with MSO44B() as scope:
+            if not scope.connect(): return
+            scope.setup_trigger(source_channel=1, level=0.0, slope='rising')
+            try:
+                ascii_result = scope.read_channel_waveform(1, use_binary=False)
+                binary_result = scope.read_channel_waveform(1, use_binary=True)
                 
-                print(f"\nVoltage differences (first 10 points):")
-                print(f"Maximum difference: {max_diff:.2e} V")
-                print(f"Average difference: {avg_diff:.2e} V")
+                ascii_volt = ascii_result['voltage_data'][:5]
+                binary_volt = binary_result['voltage_data'][:5]
                 
-                if max_diff < 1e-6:  # Less than 1 µV difference
-                    print("✓ Negligible difference between formats")
-                elif max_diff < 1e-3:  # Less than 1 mV difference
-                    print("⚠ Small difference - ASCII precision may be adequate")
-                else:
-                    print("⚠ Significant difference - consider using binary format")
-            
-        except Exception as e:
-            print(f"Comparison test failed: {e}")
-        
-        print("\nFormat comparison test complete!")
+                print(f"ASCII:  {ascii_volt}")
+                print(f"Binary: {binary_volt}")
+                
+                if len(ascii_volt) == len(binary_volt):
+                    differences = [abs(a - b) for a, b in zip(ascii_volt, binary_volt)]
+                    max_diff = max(differences) if differences else 0
+                    print(f"Max difference: {max_diff:.2e} V")
+                    if max_diff < 1e-6:
+                        print("✓ Negligible difference")
+                    else:
+                        print("⚠ Consider binary format for higher precision")
+            except Exception as e:
+                print(f"Error: {e}")
 
 def main():
-    """Main function to run the instrument tests."""
-    print("Choose test to run:")
-    print("1. AFG31000 manual test")
-    print("2. Original pyMSO4 scope test")  
-    print("3. SimpleMSO44B wrapper test")
-    print("4. Combined AFG + SimpleMSO44B test")
-    print("5. Instrument discovery test")
-    print("6. Reusable methods test")
-    print("7. ASCII vs Binary accuracy test")
+    """Run instrument driver examples."""
+    examples = InstrumentExamples()
     
-    choice = input("Enter choice (1-7) or press Enter for SimpleMSO44B test: ").strip()
+    menu = {
+        '1': ('AFG31000 Basic Example', examples.afg_basic_example),
+        '2': ('Raw pyMSO4 Example', examples.mso_raw_pyMSO4_example),
+        '3': ('MSO44B Wrapper Example', examples.mso_simple_wrapper_example),
+        '4': ('Combined AFG + MSO Example', examples.combined_afg_mso_example),
+        '5': ('Instrument Discovery Example', examples.instrument_discovery_example),
+        '6': ('Reusable Methods Example', examples.reusable_methods_example),
+        '7': ('ASCII vs Binary Example', examples.ascii_vs_binary_example),
+    }
     
-    if choice == '1':
-        AFGTestManual()
-    elif choice == '2':
-        scope_setup()
-    elif choice == '3' or choice == '':
-        simple_mso44b_test()
-    elif choice == '4':
-        combined_test()
-    elif choice == '5':
-        instrument_discovery_test()
-    elif choice == '6':
-        reusable_methods_test()
-    elif choice == '7':
-        ascii_vs_binary_test()
+    print("Instrument Driver Examples:")
+    for key, (desc, _) in menu.items():
+        print(f"{key}. {desc}")
+    
+    choice = input("Enter choice (1-7) or press Enter for default: ").strip()
+    
+    if choice in menu:
+        _, method = menu[choice]
+        method()
     else:
-        print("Invalid choice. Running SimpleMSO44B test...")
-        simple_mso44b_test()
+        print("Running default MSO44B example...")
+        examples.mso_simple_wrapper_example()
 
 if __name__ == "__main__":
     main()

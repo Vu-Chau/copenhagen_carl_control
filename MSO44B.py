@@ -8,7 +8,7 @@ from pyMSO4 import MSO4
 from pyMSO4.triggers import MSO4EdgeTrigger
 
 
-class SimpleMSO44B:
+class MSO44B:
     """
     Simple wrapper for MSO44B oscilloscope control.
     Provides easy-to-use methods for scientists to capture and analyze waveforms.
@@ -577,7 +577,7 @@ class SimpleMSO44B:
 
 
 # Legacy compatibility - keep the original minimal class
-class MSO44B:
+class MSO44BLegacy:
     """Legacy MSO44B class for backward compatibility."""
     
     def __init__(self, resource_name=None, ip_address=None, serial_port=None):
