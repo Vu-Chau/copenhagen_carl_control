@@ -229,7 +229,7 @@ class SimpleMSO44B:
             # Configure waveform data format
             self.scope.acq.wfm_encoding = 'binary'
             self.scope.acq.wfm_binary_format = 'fp'
-            self.scope.acq.wfm_byte_nr = 4
+            self.scope.acq.wfm_byte_nr = 8  # Use 8 bytes for floating point
             self.scope.acq.wfm_byte_order = 'lsb'
             
             # Start single acquisition and wait for trigger
