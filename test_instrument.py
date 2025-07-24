@@ -141,39 +141,49 @@ def combined_test():
     """Combined test of AFG31000 and SimpleMSO44B for complete workflow."""
     print("=== Combined AFG31000 + SimpleMSO44B Test ===\n")
     
-    # Setup AFG31000
-    print("Setting up AFG31000...")
-    afg = AFG31000()
-    afg.set_output(1, 'OFF')
-    afg.set_output(2, 'OFF')
-    afg.set_frequency(1, 1000)  # 1 kHz for easy triggering
-    afg.set_waveform_type(1, 'SQUare')
-    afg.set_amplitude(1, 2.0)  # 2 Vpp
-    afg.set_offset(1, 0.0)
-    afg.set_output(1, 'ON')
-    print("AFG31000 generating 1kHz square wave, 2Vpp")
-    
-    # Use SimpleMSO44B to capture
-    with SimpleMSO44B() as scope:
-        if scope.connect():
-            # Setup trigger for the AFG signal
-            scope.setup_trigger(source_channel=1, level=1.0, slope='rising')
-            
-            # Capture the generated waveform
-            results = scope.capture_waveforms(
-                channels=[1], 
-                filename="afg_test_capture",
-                plot=True,
-                save_csv=True
-            )
-            
-            if results:
-                print("Successfully captured AFG-generated waveform!")
-    
-    # Turn off AFG
-    afg.set_output(1, 'OFF')
-    afg.close()
-    print("Test complete.")
+    afg = None
+    try:
+        # Setup AFG31000
+        print("Setting up AFG31000...")
+        afg = AFG31000()
+        afg.set_output(1, 'OFF')
+        afg.set_output(2, 'OFF')
+        afg.set_frequency(1, 1000)  # 1 kHz for easy triggering
+        afg.set_waveform_type(1, 'SQUare')
+        afg.set_amplitude(1, 2.0)  # 2 Vpp
+        afg.set_offset(1, 0.0)
+        afg.set_output(1, 'ON')
+        print("AFG31000 generating 1kHz square wave, 2Vpp")
+        
+        # Use SimpleMSO44B to capture
+        with SimpleMSO44B() as scope:
+            if scope.connect():
+                # Setup trigger for the AFG signal
+                scope.setup_trigger(source_channel=1, level=1.0, slope='rising')
+                
+                # Capture the generated waveform
+                results = scope.capture_waveforms(
+                    channels=[1], 
+                    filename="afg_test_capture",
+                    plot=True,
+                    save_csv=True
+                )
+                
+                if results:
+                    print("Successfully captured AFG-generated waveform!")
+        
+    except Exception as e:
+        print(f"Combined test failed: {e}")
+    finally:
+        # Safely turn off AFG
+        if afg:
+            try:
+                afg.set_output(1, 'OFF')
+                afg.close()
+                print("AFG31000 turned off and closed.")
+            except Exception as e:
+                print(f"Warning: Failed to properly close AFG: {e}")
+        print("Test complete.")
 
 def instrument_discovery_test():
     """Test instrument discovery capabilities."""

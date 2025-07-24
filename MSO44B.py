@@ -167,13 +167,22 @@ class SimpleMSO44B:
         try:
             # Set up edge trigger
             self.scope.trigger = MSO4EdgeTrigger
-            self.scope.trigger.source = source_channel
+            
+            # Convert channel number to string format expected by pyMSO4
+            if isinstance(source_channel, int):
+                source_str = f'ch{source_channel}'
+            else:
+                source_str = str(source_channel).lower()
+            
+            self.scope.trigger.source = source_str
             self.scope.trigger.level = level
             
-            if slope.lower() == 'rising':
-                self.scope.trigger.slope = 'RISing'
-            elif slope.lower() == 'falling':
-                self.scope.trigger.slope = 'FALling'
+            # Map slope names to pyMSO4 expected values
+            slope_lower = slope.lower()
+            if slope_lower in ['rising', 'rise']:
+                self.scope.trigger.edge_slope = 'rise'
+            elif slope_lower in ['falling', 'fall']:
+                self.scope.trigger.edge_slope = 'fall'
             else:
                 raise ValueError("Slope must be 'rising' or 'falling'")
                 
@@ -204,12 +213,28 @@ class SimpleMSO44B:
             
         try:
             # Enable requested channels
-            for i in range(1, 5):  # MSO44 has 4 channels
-                self.scope.ch_a[i].enable = i in channels
+            for i in range(1, self.scope.ch_a_num + 1):
+                if i < len(self.scope.ch_a):
+                    self.scope.ch_a[i].enable = i in channels
+            
+            # Configure acquisition for the channels
+            channel_names = [f'ch{ch}' for ch in channels if 1 <= ch <= self.scope.ch_a_num]
+            self.scope.acq.wfm_src = channel_names
+            
+            # Set up acquisition parameters
+            self.scope.acq.mode = 'sample'
+            self.scope.acq.stop_after = 'sequence'
+            self.scope.acq.num_seq = 1
+            
+            # Configure waveform data format
+            self.scope.acq.wfm_encoding = 'binary'
+            self.scope.acq.wfm_binary_format = 'fp'
+            self.scope.acq.wfm_byte_nr = 4
+            self.scope.acq.wfm_byte_order = 'lsb'
             
             # Start single acquisition and wait for trigger
             print("Waiting for trigger...")
-            self.scope.acq.single()
+            self.scope.sc.write('ACQuire:STATE RUN')
             
             # Wait for acquisition to complete
             while self.scope.busy():
@@ -220,17 +245,26 @@ class SimpleMSO44B:
             time_data = None
             
             for ch in channels:
-                if ch < 1 or ch > 4:
+                if ch < 1 or ch > self.scope.ch_a_num:
                     print(f"Warning: Invalid channel {ch}. Skipping.")
                     continue
                     
-                # Get waveform data
-                data = self.scope.ch_a[ch].waveform()
-                if time_data is None:
+                # Set data source for this channel
+                self.scope.acq.wfm_src = [f'ch{ch}']
+                
+                # Get waveform data using pyMSO4 binary query
+                wfm = self.scope.sc.query_binary_values(
+                    'CURVE?', 
+                    datatype=self.scope.acq.get_datatype(), 
+                    is_big_endian=self.scope.acq.is_big_endian
+                )
+                
+                # Get time data from channel object
+                if time_data is None and ch < len(self.scope.ch_a):
                     time_data = self.scope.ch_a[ch].time()
                 
-                waveform_data[f'CH{ch}'] = data
-                print(f"Captured {len(data)} points from CH{ch}")
+                waveform_data[f'CH{ch}'] = wfm
+                print(f"Captured {len(wfm)} points from CH{ch}")
             
             waveform_data['Time'] = time_data
             
