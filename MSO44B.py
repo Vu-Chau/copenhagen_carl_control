@@ -259,9 +259,12 @@ class SimpleMSO44B:
                     is_big_endian=self.scope.acq.is_big_endian
                 )
                 
-                # Get time data from channel object
-                if time_data is None and ch < len(self.scope.ch_a):
-                    time_data = self.scope.ch_a[ch].time()
+                # Generate time data from acquisition parameters
+                if time_data is None:
+                    # Get horizontal parameters to generate time axis
+                    sample_rate = self.scope.acq.horiz_sample_rate
+                    record_length = len(wfm)
+                    time_data = np.arange(record_length) / sample_rate
                 
                 waveform_data[f'CH{ch}'] = wfm
                 print(f"Captured {len(wfm)} points from CH{ch}")
