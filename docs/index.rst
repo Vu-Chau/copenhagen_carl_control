@@ -11,7 +11,13 @@ Quick Start
 
 .. code-block:: bash
 
-   pip install pyvisa matplotlib numpy
+   pip install -r requirements.txt
+
+Or install individually:
+
+.. code-block:: bash
+
+   pip install pyvisa>=1.11.0 numpy>=1.20.0 matplotlib>=3.5.0 pyMSO4
 
 **Basic usage:**
 

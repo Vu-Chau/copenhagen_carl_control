@@ -35,18 +35,27 @@ Both instruments can be controlled via:
 
 ## Requirements
 
-- Python 3.6+
+- Python 3.10+
 - PyVISA library
+- NumPy library  
+- Matplotlib library
+- pyMSO4 library
 - VISA runtime (NI-VISA or similar)
 
 ## Installation
 
-1. Install PyVISA:
+1. Clone this repository:
 ```bash
-pip install pyvisa
+git clone <repository-url>
+cd copenhagen_carl_control
 ```
 
-2. Install VISA runtime from your instrument vendor (e.g., NI-VISA from National Instruments)
+2. Install all dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Install VISA runtime from your instrument vendor (e.g., NI-VISA from National Instruments)
 
 3. Clone this repository:
 ```bash
