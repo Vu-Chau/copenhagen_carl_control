@@ -83,7 +83,7 @@ class InstrumentExamples:
             afg.set_frequency(1, 1000)  # 1 kHz
             afg.set_waveform_type(1, 'SQUare')
             afg.set_amplitude(1, 2.0)  # 2 Vpp
-            afg.set_load(1, '50ohm')
+            afg.set_load(1, '50')
             afg.set_output(1, 'ON')
             print("AFG: 1kHz square wave, 2Vpp")
             
