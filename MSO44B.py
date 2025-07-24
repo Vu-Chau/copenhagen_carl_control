@@ -276,12 +276,13 @@ class SimpleMSO44B:
         # Formula: time = (index - pt_off) * x_incr + x_zero
         return np.array([(i - pt_off) * x_incr + x_zero for i in range(data_length)])
     
-    def read_channel_waveform(self, channel):
+    def read_channel_waveform(self, channel, use_binary=False):
         """
         Read and convert waveform data from a single channel.
         
         Args:
             channel (int): Channel number (1-4)
+            use_binary (bool): If True, use binary format for higher precision
             
         Returns:
             dict: Dictionary with 'raw_data', 'voltage_data', and 'scaling_params'
@@ -295,9 +296,24 @@ class SimpleMSO44B:
         # Set data source to this channel
         self.scope.acq.wfm_src = [f'ch{channel}']
         
-        # Get raw waveform data using ASCII query
-        wfm_str = self.scope.sc.query('CURVE?').strip()
-        raw_data = [float(x) for x in wfm_str.split(',')]
+        if use_binary:
+            # Configure for binary format with proper settings
+            self.scope.acq.wfm_encoding = 'binary'
+            self.scope.acq.wfm_binary_format = 'ri'  # Signed integer
+            self.scope.acq.wfm_byte_nr = 2  # 2 bytes per sample
+            self.scope.acq.wfm_byte_order = 'lsb'
+            
+            # Get raw waveform data using binary query
+            raw_data = self.scope.sc.query_binary_values(
+                'CURVE?', 
+                datatype=self.scope.acq.get_datatype(), 
+                is_big_endian=self.scope.acq.is_big_endian
+            )
+        else:
+            # Use ASCII format (more reliable but potentially less precise)
+            self.scope.acq.wfm_encoding = 'ascii'
+            wfm_str = self.scope.sc.query('CURVE?').strip()
+            raw_data = [float(x) for x in wfm_str.split(',')]
         
         # Get scaling parameters and convert to voltages
         scaling_params = self.get_waveform_scaling_params(channel)
@@ -306,7 +322,8 @@ class SimpleMSO44B:
         return {
             'raw_data': raw_data,
             'voltage_data': voltage_data,
-            'scaling_params': scaling_params
+            'scaling_params': scaling_params,
+            'format_used': 'binary' if use_binary else 'ascii'
         }
     
     def capture_waveforms(self, channels=[1], filename=None, plot=True, save_csv=True):

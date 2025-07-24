@@ -243,6 +243,61 @@ def reusable_methods_test():
         
         print("\nReusable methods test complete!")
 
+def ascii_vs_binary_test():
+    """Compare ASCII vs binary data format accuracy."""
+    print("=== ASCII vs Binary Accuracy Test ===\n")
+    
+    with SimpleMSO44B() as scope:
+        if not scope.connect():
+            print("Failed to connect to MSO44B.")
+            return
+        
+        # Setup trigger
+        scope.setup_trigger(source_channel=1, level=0.0, slope='rising')
+        
+        try:
+            print("Reading waveform in ASCII format...")
+            ascii_result = scope.read_channel_waveform(1, use_binary=False)
+            
+            print("Reading waveform in binary format...")
+            binary_result = scope.read_channel_waveform(1, use_binary=True)
+            
+            # Compare the results
+            ascii_raw = ascii_result['raw_data'][:10]
+            binary_raw = binary_result['raw_data'][:10]
+            ascii_volt = ascii_result['voltage_data'][:10]
+            binary_volt = binary_result['voltage_data'][:10]
+            
+            print(f"\nFirst 10 raw values:")
+            print(f"ASCII:  {ascii_raw}")
+            print(f"Binary: {binary_raw}")
+            
+            print(f"\nFirst 10 voltage values:")
+            print(f"ASCII:  {ascii_volt}")
+            print(f"Binary: {binary_volt}")
+            
+            # Calculate differences
+            if len(ascii_volt) == len(binary_volt):
+                differences = [abs(a - b) for a, b in zip(ascii_volt, binary_volt)]
+                max_diff = max(differences[:10]) if differences else 0
+                avg_diff = sum(differences[:10]) / len(differences[:10]) if differences else 0
+                
+                print(f"\nVoltage differences (first 10 points):")
+                print(f"Maximum difference: {max_diff:.2e} V")
+                print(f"Average difference: {avg_diff:.2e} V")
+                
+                if max_diff < 1e-6:  # Less than 1 µV difference
+                    print("✓ Negligible difference between formats")
+                elif max_diff < 1e-3:  # Less than 1 mV difference
+                    print("⚠ Small difference - ASCII precision may be adequate")
+                else:
+                    print("⚠ Significant difference - consider using binary format")
+            
+        except Exception as e:
+            print(f"Comparison test failed: {e}")
+        
+        print("\nFormat comparison test complete!")
+
 def main():
     """Main function to run the instrument tests."""
     print("Choose test to run:")
@@ -252,8 +307,9 @@ def main():
     print("4. Combined AFG + SimpleMSO44B test")
     print("5. Instrument discovery test")
     print("6. Reusable methods test")
+    print("7. ASCII vs Binary accuracy test")
     
-    choice = input("Enter choice (1-6) or press Enter for SimpleMSO44B test: ").strip()
+    choice = input("Enter choice (1-7) or press Enter for SimpleMSO44B test: ").strip()
     
     if choice == '1':
         AFGTestManual()
@@ -267,6 +323,8 @@ def main():
         instrument_discovery_test()
     elif choice == '6':
         reusable_methods_test()
+    elif choice == '7':
+        ascii_vs_binary_test()
     else:
         print("Invalid choice. Running SimpleMSO44B test...")
         simple_mso44b_test()
