@@ -193,6 +193,122 @@ class SimpleMSO44B:
             print(f"Trigger setup failed: {e}")
             return False
     
+    def get_waveform_scaling_params(self, channel):
+        """
+        Get voltage scaling parameters for a specific channel.
+        
+        Args:
+            channel (int): Channel number (1-4)
+            
+        Returns:
+            dict: Dictionary with scaling parameters
+        """
+        if not self.connected:
+            raise RuntimeError("Not connected to scope")
+            
+        # Set data source to the specific channel
+        self.scope.acq.wfm_src = [f'ch{channel}']
+        
+        # Get scaling parameters from WFMOutpre
+        scaling_params = {
+            'y_mult': float(self.scope.sc.query('WFMOutpre:YMUlt?').strip()),
+            'y_zero': float(self.scope.sc.query('WFMOutpre:YZEro?').strip()),
+            'y_off': float(self.scope.sc.query('WFMOutpre:YOFf?').strip()),
+            'channel_scale': self.scope.ch_a[channel].scale,
+            'channel_position': self.scope.ch_a[channel].position
+        }
+        
+        return scaling_params
+    
+    def get_time_scaling_params(self):
+        """
+        Get time scaling parameters for waveform data.
+        
+        Returns:
+            dict: Dictionary with time scaling parameters
+        """
+        if not self.connected:
+            raise RuntimeError("Not connected to scope")
+            
+        time_params = {
+            'x_incr': float(self.scope.sc.query('WFMOutpre:XINcr?').strip()),
+            'x_zero': float(self.scope.sc.query('WFMOutpre:XZEro?').strip()),
+            'pt_off': float(self.scope.sc.query('WFMOutpre:PT_Off?').strip()),
+            'sample_rate': self.scope.acq.horiz_sample_rate,
+            'horiz_scale': self.scope.acq.horiz_scale
+        }
+        
+        return time_params
+    
+    def convert_raw_to_voltage(self, raw_data, scaling_params):
+        """
+        Convert raw ADC values to actual voltages.
+        
+        Args:
+            raw_data (list): Raw ADC values
+            scaling_params (dict): Scaling parameters from get_waveform_scaling_params()
+            
+        Returns:
+            list: Voltage values in volts
+        """
+        y_mult = scaling_params['y_mult']
+        y_zero = scaling_params['y_zero']
+        y_off = scaling_params['y_off']
+        
+        # Formula: voltage = (raw - y_off) * y_mult + y_zero
+        return [(raw - y_off) * y_mult + y_zero for raw in raw_data]
+    
+    def generate_time_axis(self, data_length, time_params):
+        """
+        Generate proper time axis for waveform data.
+        
+        Args:
+            data_length (int): Number of data points
+            time_params (dict): Time parameters from get_time_scaling_params()
+            
+        Returns:
+            numpy.array: Time values in seconds
+        """
+        x_incr = time_params['x_incr']
+        x_zero = time_params['x_zero']
+        pt_off = time_params['pt_off']
+        
+        # Formula: time = (index - pt_off) * x_incr + x_zero
+        return np.array([(i - pt_off) * x_incr + x_zero for i in range(data_length)])
+    
+    def read_channel_waveform(self, channel):
+        """
+        Read and convert waveform data from a single channel.
+        
+        Args:
+            channel (int): Channel number (1-4)
+            
+        Returns:
+            dict: Dictionary with 'raw_data', 'voltage_data', and 'scaling_params'
+        """
+        if not self.connected:
+            raise RuntimeError("Not connected to scope")
+            
+        if channel < 1 or channel > self.scope.ch_a_num:
+            raise ValueError(f"Invalid channel {channel}. Must be 1-{self.scope.ch_a_num}")
+        
+        # Set data source to this channel
+        self.scope.acq.wfm_src = [f'ch{channel}']
+        
+        # Get raw waveform data using ASCII query
+        wfm_str = self.scope.sc.query('CURVE?').strip()
+        raw_data = [float(x) for x in wfm_str.split(',')]
+        
+        # Get scaling parameters and convert to voltages
+        scaling_params = self.get_waveform_scaling_params(channel)
+        voltage_data = self.convert_raw_to_voltage(raw_data, scaling_params)
+        
+        return {
+            'raw_data': raw_data,
+            'voltage_data': voltage_data,
+            'scaling_params': scaling_params
+        }
+    
     def capture_waveforms(self, channels=[1], filename=None, plot=True, save_csv=True):
         """
         Capture waveforms from specified channels with trigger.
@@ -237,7 +353,7 @@ class SimpleMSO44B:
             while self.scope.busy():
                 pass
             
-            # Capture waveform data
+            # Capture waveform data using reusable methods
             waveform_data = {}
             time_data = None
             
@@ -245,24 +361,18 @@ class SimpleMSO44B:
                 if ch < 1 or ch > self.scope.ch_a_num:
                     print(f"Warning: Invalid channel {ch}. Skipping.")
                     continue
-                    
-                # Set data source for this channel
-                self.scope.acq.wfm_src = [f'ch{ch}']
                 
-                # Get waveform data using ASCII query for reliability
-                wfm_str = self.scope.sc.query('CURVE?').strip()
-                # Convert comma-separated ASCII values to float array
-                wfm = [float(x) for x in wfm_str.split(',')]
+                # Use the reusable waveform reading method
+                waveform_result = self.read_channel_waveform(ch)
+                voltage_data = waveform_result['voltage_data']
                 
-                # Generate time data from acquisition parameters
+                # Generate time data once (same for all channels)
                 if time_data is None:
-                    # Get horizontal parameters to generate time axis
-                    sample_rate = self.scope.acq.horiz_sample_rate
-                    record_length = len(wfm)
-                    time_data = np.arange(record_length) / sample_rate
+                    time_params = self.get_time_scaling_params()
+                    time_data = self.generate_time_axis(len(voltage_data), time_params)
                 
-                waveform_data[f'CH{ch}'] = wfm
-                print(f"Captured {len(wfm)} points from CH{ch}")
+                waveform_data[f'CH{ch}'] = voltage_data
+                print(f"Captured {len(voltage_data)} points from CH{ch}")
             
             waveform_data['Time'] = time_data
             

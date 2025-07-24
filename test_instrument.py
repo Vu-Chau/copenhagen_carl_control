@@ -209,6 +209,40 @@ def instrument_discovery_test():
     else:
         print("\nNo MSO44/46 instruments found for connection test.")
 
+def reusable_methods_test():
+    """Test the new reusable voltage conversion and waveform reading methods."""
+    print("=== Reusable Methods Test ===\n")
+    
+    with SimpleMSO44B() as scope:
+        if not scope.connect():
+            print("Failed to connect to MSO44B.")
+            return
+        
+        # Setup a simple trigger
+        scope.setup_trigger(source_channel=1, level=0.0, slope='rising')
+        
+        # Test individual channel reading
+        print("Testing individual channel waveform reading...")
+        try:
+            waveform_result = scope.read_channel_waveform(1)
+            
+            print(f"Raw data points: {len(waveform_result['raw_data'])}")
+            print(f"Voltage data points: {len(waveform_result['voltage_data'])}")
+            print(f"Sample raw values: {waveform_result['raw_data'][:5]}")
+            print(f"Sample voltage values: {waveform_result['voltage_data'][:5]}")
+            print(f"Scaling parameters: {waveform_result['scaling_params']}")
+            
+            # Test time axis generation
+            time_params = scope.get_time_scaling_params()
+            time_axis = scope.generate_time_axis(len(waveform_result['voltage_data']), time_params)
+            print(f"Time axis range: {time_axis[0]:.6e}s to {time_axis[-1]:.6e}s")
+            print(f"Time parameters: {time_params}")
+            
+        except Exception as e:
+            print(f"Method test failed: {e}")
+        
+        print("\nReusable methods test complete!")
+
 def main():
     """Main function to run the instrument tests."""
     print("Choose test to run:")
@@ -217,8 +251,9 @@ def main():
     print("3. SimpleMSO44B wrapper test")
     print("4. Combined AFG + SimpleMSO44B test")
     print("5. Instrument discovery test")
+    print("6. Reusable methods test")
     
-    choice = input("Enter choice (1-5) or press Enter for SimpleMSO44B test: ").strip()
+    choice = input("Enter choice (1-6) or press Enter for SimpleMSO44B test: ").strip()
     
     if choice == '1':
         AFGTestManual()
@@ -230,6 +265,8 @@ def main():
         combined_test()
     elif choice == '5':
         instrument_discovery_test()
+    elif choice == '6':
+        reusable_methods_test()
     else:
         print("Invalid choice. Running SimpleMSO44B test...")
         simple_mso44b_test()
