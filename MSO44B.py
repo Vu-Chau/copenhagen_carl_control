@@ -226,11 +226,8 @@ class SimpleMSO44B:
             self.scope.acq.stop_after = 'sequence'
             self.scope.acq.num_seq = 1
             
-            # Configure waveform data format
-            self.scope.acq.wfm_encoding = 'binary'
-            self.scope.acq.wfm_binary_format = 'fp'
-            self.scope.acq.wfm_byte_nr = 8  # Use 8 bytes for floating point
-            self.scope.acq.wfm_byte_order = 'lsb'
+            # Configure waveform data format - use ASCII for reliability
+            self.scope.acq.wfm_encoding = 'ascii'
             
             # Start single acquisition and wait for trigger
             print("Waiting for trigger...")
@@ -252,12 +249,10 @@ class SimpleMSO44B:
                 # Set data source for this channel
                 self.scope.acq.wfm_src = [f'ch{ch}']
                 
-                # Get waveform data using pyMSO4 binary query
-                wfm = self.scope.sc.query_binary_values(
-                    'CURVE?', 
-                    datatype=self.scope.acq.get_datatype(), 
-                    is_big_endian=self.scope.acq.is_big_endian
-                )
+                # Get waveform data using ASCII query for reliability
+                wfm_str = self.scope.sc.query('CURVE?').strip()
+                # Convert comma-separated ASCII values to float array
+                wfm = [float(x) for x in wfm_str.split(',')]
                 
                 # Generate time data from acquisition parameters
                 if time_data is None:
