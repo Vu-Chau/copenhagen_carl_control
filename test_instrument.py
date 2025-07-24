@@ -175,6 +175,30 @@ def combined_test():
     afg.close()
     print("Test complete.")
 
+def instrument_discovery_test():
+    """Test instrument discovery capabilities."""
+    print("=== Instrument Discovery Test ===\n")
+    
+    print("1. Discovering all instruments:")
+    all_instruments = SimpleMSO44B.list_all_instruments()
+    
+    print("\n2. Discovering MSO44/46 instruments specifically:")
+    scope = SimpleMSO44B()
+    mso_instruments = scope._discover_mso44_instruments()
+    
+    if mso_instruments:
+        print(f"\nFound {len(mso_instruments)} MSO44/46 instrument(s) ready for connection.")
+        
+        # Test connection to first discovered instrument
+        print("\n3. Testing connection to first discovered MSO44/46...")
+        if scope.connect():
+            print("✓ Connection successful!")
+            scope.disconnect()
+        else:
+            print("✗ Connection failed.")
+    else:
+        print("\nNo MSO44/46 instruments found for connection test.")
+
 def main():
     """Main function to run the instrument tests."""
     print("Choose test to run:")
@@ -182,8 +206,9 @@ def main():
     print("2. Original pyMSO4 scope test")  
     print("3. SimpleMSO44B wrapper test")
     print("4. Combined AFG + SimpleMSO44B test")
+    print("5. Instrument discovery test")
     
-    choice = input("Enter choice (1-4) or press Enter for SimpleMSO44B test: ").strip()
+    choice = input("Enter choice (1-5) or press Enter for SimpleMSO44B test: ").strip()
     
     if choice == '1':
         AFGTestManual()
@@ -193,6 +218,8 @@ def main():
         simple_mso44b_test()
     elif choice == '4':
         combined_test()
+    elif choice == '5':
+        instrument_discovery_test()
     else:
         print("Invalid choice. Running SimpleMSO44B test...")
         simple_mso44b_test()

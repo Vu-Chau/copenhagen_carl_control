@@ -25,55 +25,122 @@ class SimpleMSO44B:
         self.connected = False
         self.ip_address = None
         
-    def connect(self, ip_address=None):
+    def _discover_mso44_instruments(self):
         """
-        Automatically find and connect to MSO44B scope.
+        Discover MSO44/MSO46 instruments using pyvisa by checking device IDs.
+        
+        Returns:
+            list: List of dictionaries containing 'resource' and 'device_id' keys for MSO44/46 instruments
+        """
+        rm = pyvisa.ResourceManager()
+        mso_instruments = []
+        
+        try:
+            resources = rm.list_resources()
+            print(f"Scanning {len(resources)} available instruments for MSO44/MSO46...")
+            
+            for resource in resources:
+                try:
+                    temp_instrument = rm.open_resource(resource)
+                    temp_instrument.timeout = 2000  # Short timeout for discovery
+                    
+                    # Query device identification
+                    device_id = temp_instrument.query('*IDN?').strip()
+                    print(f"  {resource}: {device_id}")
+                    
+                    # Check if this is an MSO44 or MSO46 instrument
+                    if any(model in device_id.upper() for model in ['MSO44', 'MSO46']):
+                        mso_instruments.append({
+                            'resource': resource,
+                            'device_id': device_id
+                        })
+                        print(f"    ✓ MSO44/46 instrument found!")
+                    
+                    temp_instrument.close()
+                    
+                except Exception as e:
+                    print(f"    ✗ Could not query {resource}: {e}")
+                    try:
+                        temp_instrument.close()
+                    except:
+                        pass
+                    continue
+            
+            if mso_instruments:
+                print(f"\nFound {len(mso_instruments)} MSO44/46 instrument(s):")
+                for i, instr in enumerate(mso_instruments):
+                    print(f"  {i+1}. {instr['resource']} - {instr['device_id']}")
+            else:
+                print("\nNo MSO44/46 instruments found.")
+                
+        except Exception as e:
+            print(f"Error during instrument discovery: {e}")
+        finally:
+            rm.close()
+        
+        return mso_instruments
+
+    def connect(self, ip_address=None, auto_discover=True):
+        """
+        Connect to MSO44B scope with automatic discovery or specific IP.
         
         Args:
             ip_address (str, optional): Specific IP address to connect to.
-                                      If None, attempts to auto-discover.
+            auto_discover (bool): If True and no ip_address given, attempts auto-discovery via pyvisa.
         
         Returns:
             bool: True if connection successful, False otherwise
         """
         try:
             if ip_address:
-                # Connect to specific IP
+                # Connect to specific IP using pyMSO4
                 self.scope.con(ip=ip_address)
                 self.ip_address = ip_address
                 self.connected = True
                 print(f"Connected to MSO44B at {ip_address}")
                 return True
+            elif auto_discover:
+                # Use pyvisa to discover MSO44/46 instruments
+                mso_instruments = self._discover_mso44_instruments()
+                
+                if mso_instruments:
+                    # Try to connect to each discovered MSO instrument
+                    for instr in mso_instruments:
+                        try:
+                            resource = instr['resource']
+                            
+                            # Extract connection info from resource string
+                            if 'TCPIP' in resource:
+                                # Extract IP from TCPIP resource string
+                                # Format: TCPIP0::192.168.1.100::inst0::INSTR or TCPIP::192.168.1.100::INSTR
+                                parts = resource.split('::')
+                                if len(parts) >= 3:
+                                    ip = parts[1]
+                                    self.scope.con(ip=ip)
+                                    self.ip_address = ip
+                                    self.connected = True
+                                    print(f"Connected to MSO44B at {ip} (discovered via pyvisa)")
+                                    return True
+                            elif 'USB' in resource:
+                                # Extract VID/PID from USB resource string
+                                # Format: USB0::0x0699::0x0527::C012345::INSTR
+                                parts = resource.split('::')
+                                if len(parts) >= 3:
+                                    vid = int(parts[1], 16)
+                                    pid = int(parts[2], 16)
+                                    self.scope.con(usb_vid_pid=(vid, pid))
+                                    self.connected = True
+                                    self.ip_address = "USB"
+                                    print(f"Connected to MSO44B via USB (discovered via pyvisa)")
+                                    return True
+                        except Exception as e:
+                            print(f"  Failed to connect to {resource}: {e}")
+                            continue
+                
+                print("No MSO44/46 instruments discovered or failed to connect to discovered instruments.")
+                return False
             else:
-                # Try common IP addresses for MSO44B
-                common_ips = [
-                    "192.168.1.100",
-                    "192.168.0.100", 
-                    "10.0.0.100",
-                    "172.16.0.100"
-                ]
-                
-                for ip in common_ips:
-                    try:
-                        self.scope.con(ip=ip)
-                        self.ip_address = ip
-                        self.connected = True
-                        print(f"Auto-discovered and connected to MSO44B at {ip}")
-                        return True
-                    except:
-                        continue
-                
-                # Try USB connection as fallback
-                try:
-                    self.scope.con(usb_vid_pid=(0x0699, 0x0527))  # Tektronix MSO44
-                    self.connected = True
-                    self.ip_address = "USB"
-                    print("Connected to MSO44B via USB")
-                    return True
-                except:
-                    pass
-                    
-                print("Failed to auto-discover MSO44B. Please specify IP address.")
+                print("No connection method specified. Provide ip_address or enable auto_discover.")
                 return False
                 
         except Exception as e:
@@ -295,6 +362,59 @@ class SimpleMSO44B:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit - automatically disconnect."""
         self.disconnect()
+    
+    @staticmethod
+    def list_all_instruments():
+        """
+        List all available VISA instruments with their device IDs, highlighting MSO44/46.
+        
+        Returns:
+            list: List of dictionaries containing 'resource', 'device_id', and 'is_mso44' keys
+        """
+        rm = pyvisa.ResourceManager()
+        instruments = []
+        
+        try:
+            resources = rm.list_resources()
+            print(f"Scanning {len(resources)} available instruments:")
+            print("-" * 70)
+            
+            for resource in resources:
+                try:
+                    temp_instrument = rm.open_resource(resource)
+                    temp_instrument.timeout = 2000
+                    
+                    device_id = temp_instrument.query('*IDN?').strip()
+                    is_mso44 = any(model in device_id.upper() for model in ['MSO44', 'MSO46'])
+                    
+                    instruments.append({
+                        'resource': resource,
+                        'device_id': device_id,
+                        'is_mso44': is_mso44
+                    })
+                    
+                    status = "MSO44/46 ✓" if is_mso44 else "Other"
+                    print(f"{resource:<30} | {status:<10} | {device_id}")
+                    
+                    temp_instrument.close()
+                    
+                except Exception as e:
+                    print(f"{resource:<30} | Error      | Could not query: {e}")
+                    try:
+                        temp_instrument.close()
+                    except:
+                        pass
+            
+            print("-" * 70)
+            mso_count = sum(1 for instr in instruments if instr.get('is_mso44', False))
+            print(f"Total instruments: {len(instruments)}, MSO44/46 instruments: {mso_count}")
+            
+        except Exception as e:
+            print(f"Error during instrument scan: {e}")
+        finally:
+            rm.close()
+        
+        return instruments
 
 
 # Legacy compatibility - keep the original minimal class
