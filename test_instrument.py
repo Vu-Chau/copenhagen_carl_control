@@ -159,11 +159,11 @@ def combined_test():
         with SimpleMSO44B() as scope:
             if scope.connect():
                 # Setup trigger for the AFG signal
-                scope.setup_trigger(source_channel=1, level=1.0, slope='rising')
+                scope.setup_trigger(source_channel=2, level=0.5, slope='rising')
                 
                 # Capture the generated waveform
                 results = scope.capture_waveforms(
-                    channels=[1], 
+                    channels=[1,2,3], 
                     filename="afg_test_capture",
                     plot=True,
                     save_csv=True
