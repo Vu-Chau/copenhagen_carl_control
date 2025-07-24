@@ -16,6 +16,7 @@ Both instruments can be controlled via:
 ## Features
 
 ### AFG31000 Function Generator
+- **Automatic instrument discovery** - finds AFG instruments automatically
 - Device identification and validation
 - Waveform generation (sine, square, triangle, etc.)
 - Frequency and amplitude control for dual channels
@@ -60,23 +61,36 @@ cd copenhagen_carl_control
 ```python
 from AFG31000 import AFG31000
 
-# Connect via IP address
-afg = AFG31000(resource_name="AFG31000", ip_address="192.168.1.100")
+# NEW: Automatic discovery - no connection parameters needed!
+afg = AFG31000()  # Automatically finds and connects to AFG instrument
+
+# Alternative: Connect via IP address
+# afg = AFG31000(ip_address="192.168.1.100")
 
 # Check device identity
 print(afg.device_id())
 
 # Configure channel 1
-afg.set_waveform(1, 'SIN')           # Sine wave
-afg.set_frequency(1, 1000)           # 1 kHz
-afg.set_amplitude(1, 2.0)            # 2V amplitude
-afg.set_output_state(1, True)        # Enable output
+afg.set_waveform_type(1, 'SINusoid')    # Sine wave
+afg.set_frequency(1, 1000)              # 1 kHz
+afg.set_amplitude(1, 2.0)               # 2V amplitude
+afg.set_output(1, True)                 # Enable output
 
 # Frequency lock both channels
 afg.set_frequency_lock(True)
 
 # Set phase relationship
 afg.set_phase(2, 90)  # 90 degree phase shift on channel 2
+
+# Clean up
+afg.close()
+```
+
+#### List Available Instruments
+
+```python
+# List all available instruments (static method)
+AFG31000.list_all_instruments()
 ```
 
 ### MSO44B Oscilloscope

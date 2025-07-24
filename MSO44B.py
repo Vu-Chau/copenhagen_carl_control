@@ -2,7 +2,19 @@ import pyvisa
 
 class MSO44B:
     """This class provides an interface to the MSO44B oscilloscope using the PyVISA library."""
-    def __init__(self, resource_name=None, ip_address=None, serial_port=None,timeout=5000):
+    
+    @staticmethod
+    def list_resources():
+        """List all available VISA resources for debugging connection issues."""
+        try:
+            rm = pyvisa.ResourceManager()
+            resources = rm.list_resources()
+            rm.close()
+            return list(resources)
+        except Exception as e:
+            return f"Error listing resources: {e}"
+    
+    def __init__(self, resource_name=None, ip_address=None, serial_port=None, timeout=10000):
         """Initialize the MSO44B oscilloscope with the given resource name, IP address, or serial port."""
         self.rm = pyvisa.ResourceManager()
         
@@ -18,22 +30,67 @@ class MSO44B:
         else:
             raise ValueError("Must provide either resource_name, ip_address, or serial_port")
         
-        self.scope = self.rm.open_resource(self.resource_name)
-        
-        # Configure serial settings if using serial connection
-        if serial_port:
-            self.scope.baud_rate = 115200  # Adjust as needed
-            self.scope.data_bits = 8
-            self.scope.parity = pyvisa.constants.Parity.none
-            self.scope.stop_bits = pyvisa.constants.StopBits.one
-            self.scope.flow_control = pyvisa.constants.VI_ASRL_FLOW_NONE
+        try:
+            self.scope = self.rm.open_resource(self.resource_name)
+            self.scope.timeout = timeout  # Set the timeout for VISA operations
+            
+            # Configure serial settings if using serial connection
+            if serial_port:
+                self.scope.baud_rate = 115200  # Adjust as needed
+                self.scope.data_bits = 8
+                self.scope.parity = pyvisa.constants.Parity.none
+                self.scope.stop_bits = pyvisa.constants.StopBits.one
+                self.scope.flow_control = pyvisa.constants.VI_ASRL_FLOW_NONE
+            
+            # Test basic communication
+            self.scope.write("*CLS")  # Clear status
+            test_response = self.scope.query("*IDN?")  # Test query
+            
+            # If we get here, connection is successful
+            print(f"✓ Initial connection test successful: {test_response.strip()}")
+            
+        except Exception as e:
+            # Only close resources if they were successfully created
+            try:
+                if hasattr(self, 'scope') and self.scope:
+                    self.scope.close()
+            except:
+                pass
+            try:
+                if hasattr(self, 'rm') and self.rm:
+                    self.rm.close()
+            except:
+                pass
+            raise ConnectionError(f"Failed to connect to oscilloscope at {self.resource_name}: {e}")
 
     def write(self, command):
         """Send a command to the oscilloscope."""
-        self.scope.write(command)
+        try:
+            if not hasattr(self, 'scope') or not self.scope:
+                raise ConnectionError("Oscilloscope connection is not established")
+            self.scope.write(command)
+        except Exception as e:
+            raise ConnectionError(f"Failed to write command '{command}': {e}")
+            
     def query(self, command):
         """Send a command to the oscilloscope and return the response."""
-        return self.scope.query(command)
+        try:
+            if not hasattr(self, 'scope') or not self.scope:
+                raise ConnectionError("Oscilloscope connection is not established")
+            return self.scope.query(command)
+        except Exception as e:
+            raise ConnectionError(f"Failed to query command '{command}': {e}")
+    
+    def is_connected(self):
+        """Check if the oscilloscope connection is still valid."""
+        try:
+            if not hasattr(self, 'scope') or not self.scope:
+                return False
+            # Try a simple query to test the connection
+            self.scope.query("*IDN?")
+            return True
+        except:
+            return False
     
     def device_id(self):
         """Return the device ID of the oscilloscope."""
@@ -41,7 +98,7 @@ class MSO44B:
     def check_device_id(self):
         """Check if the device ID matches the expected MSO44B ID."""
         idn = self.device_id()
-        return 'MSO44B' in idn
+        return 'MSO44' in idn
     def reset(self):
         """Reset the oscilloscope to its default settings."""
         self.write('*RST')
@@ -75,14 +132,19 @@ class MSO44B:
         """Set the state (on/off) for a specified channel."""
         if channel not in [1, 2, 3, 4]:
             raise ValueError("Channel must be 1, 2, 3, or 4")
-        if state not in ['ON', 'OFF']:
-            raise ValueError("State must be 'ON' or 'OFF'")
-        self.write(f'CH{channel}:STATE {state}')
+        if state not in ['ON', 'OFF', 1, 0, True, False]:
+            raise ValueError("State must be 'ON', 'OFF', 1, 0, True, or False")
+        
+        # Convert various input formats to the correct SCPI command
+        if state in ['ON', 1, True]:
+            self.write(f'CH{channel}:DISplay ON')
+        else:
+            self.write(f'CH{channel}:DISplay OFF')
     def get_channel_state(self, channel):
         """Get the state (on/off) for a specified channel."""
         if channel not in [1, 2, 3, 4]:
             raise ValueError("Channel must be 1, 2, 3, or 4")
-        return self.query(f'CH{channel}:STATE?')
+        return self.query(f'CH{channel}:DISplay?')
     def set_time_scale(self, scale):
         """Set the horizontal time scale for the oscilloscope."""
         self.write(f'HOR:SCA {scale}')
@@ -127,7 +189,14 @@ class MSO44B:
         """Set acquisition state - controls when scope acquires data."""
         if state not in ['RUN', 'STOP', 'SINGLE']:
             raise ValueError("State must be 'RUN', 'STOP', or 'SINGLE'")
-        self.write(f'ACQuire:STATE {state}')
+        
+        if state == 'RUN':
+            self.write('ACQuire:STATE RUN')
+        elif state == 'STOP':
+            self.write('ACQuire:STATE STOP')
+        elif state == 'SINGLE':
+            self.write('ACQuire:STOPAfter SEQuence')
+            self.write('ACQuire:STATE RUN')
     
     def get_acquisition_state(self):
         """Get the current acquisition state."""
@@ -143,7 +212,8 @@ class MSO44B:
     
     def single(self):
         """Trigger a single acquisition."""
-        self.write('ACQuire:STATE SINGLE') 
+        self.write('ACQuire:STOPAfter SEQuence')
+        self.write('ACQuire:STATE RUN') 
     def get_waveform_data(self, channel, data_format='ASCII'):
         """Get waveform data from specified channel."""
         if channel not in [1, 2, 3, 4]:

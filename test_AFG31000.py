@@ -363,7 +363,7 @@ class TestAFG31000Integration(unittest.TestCase):
         
         # Verify device
         device_id = self.afg.check_device_id()
-        self.assertIn('AFG31000', device_id)
+        self.assertIn('AFG31252', device_id)
         
         # Configure channel 1
         self.afg.set_waveform_type(1, 'SINusoid')
