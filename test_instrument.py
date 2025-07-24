@@ -1,7 +1,7 @@
 from AFG31000 import AFG31000
+from MSO44B import SimpleMSO44B
 from matplotlib import pyplot as plt
 import numpy as np
-# from MSO44B import MSO44B
 from pyMSO4 import * # Use pyMSO4 library https://github.com/ceres-c/pyMSO4
 class InstrumentTestExperiment:
     """A class to manage the AFG31000 and MSO44B instruments for testing purposes."""
@@ -100,9 +100,102 @@ def AFGTestManual():
     # while True:
     #     pass  # Keep the script running to maintain the AFG31000 state
     
+def simple_mso44b_test():
+    """Test the SimpleMSO44B wrapper for easy waveform capture."""
+    print("=== SimpleMSO44B Wrapper Test ===\n")
+    
+    with SimpleMSO44B() as scope:
+        # Auto-connect to scope
+        if not scope.connect():
+            print("Failed to connect to MSO44B. Please check connection.")
+            return
+        
+        # Setup trigger on channel 1, rising edge at 0.5V
+        scope.setup_trigger(source_channel=1, level=0.5, slope='rising')
+        
+        # Capture waveforms from multiple channels
+        print("Starting capture (waiting for trigger)...")
+        results = scope.capture_waveforms(
+            channels=[1, 2, 3], 
+            filename="test_capture",
+            plot=True, 
+            save_csv=True
+        )
+        
+        if results:
+            print(f"\nCapture successful!")
+            print(f"- Captured {results['sample_points']} points")
+            print(f"- Channels: {results['channels']}")
+            print(f"- CSV file: {results.get('csv_file', 'Not saved')}")
+            print(f"- Plot file: {results.get('plot_file', 'Not saved')}")
+            
+            # Show some basic statistics
+            waveforms = results['waveforms']
+            for ch in results['channels']:
+                ch_key = f'CH{ch}'
+                if ch_key in waveforms:
+                    data = np.array(waveforms[ch_key])
+                    print(f"- {ch_key}: Mean={np.mean(data):.3f}V, Std={np.std(data):.3f}V")
+
+def combined_test():
+    """Combined test of AFG31000 and SimpleMSO44B for complete workflow."""
+    print("=== Combined AFG31000 + SimpleMSO44B Test ===\n")
+    
+    # Setup AFG31000
+    print("Setting up AFG31000...")
+    afg = AFG31000()
+    afg.set_output(1, 'OFF')
+    afg.set_output(2, 'OFF')
+    afg.set_frequency(1, 1000)  # 1 kHz for easy triggering
+    afg.set_waveform_type(1, 'SQUare')
+    afg.set_amplitude(1, 2.0)  # 2 Vpp
+    afg.set_offset(1, 0.0)
+    afg.set_output(1, 'ON')
+    print("AFG31000 generating 1kHz square wave, 2Vpp")
+    
+    # Use SimpleMSO44B to capture
+    with SimpleMSO44B() as scope:
+        if scope.connect():
+            # Setup trigger for the AFG signal
+            scope.setup_trigger(source_channel=1, level=1.0, slope='rising')
+            
+            # Capture the generated waveform
+            results = scope.capture_waveforms(
+                channels=[1], 
+                filename="afg_test_capture",
+                plot=True,
+                save_csv=True
+            )
+            
+            if results:
+                print("Successfully captured AFG-generated waveform!")
+    
+    # Turn off AFG
+    afg.set_output(1, 'OFF')
+    afg.close()
+    print("Test complete.")
+
 def main():
-    """Main function to run the AFG31000 manual test."""
-    AFGTestManual()
-    scope_setup()
+    """Main function to run the instrument tests."""
+    print("Choose test to run:")
+    print("1. AFG31000 manual test")
+    print("2. Original pyMSO4 scope test")  
+    print("3. SimpleMSO44B wrapper test")
+    print("4. Combined AFG + SimpleMSO44B test")
+    
+    choice = input("Enter choice (1-4) or press Enter for SimpleMSO44B test: ").strip()
+    
+    if choice == '1':
+        AFGTestManual()
+    elif choice == '2':
+        scope_setup()
+    elif choice == '3' or choice == '':
+        simple_mso44b_test()
+    elif choice == '4':
+        combined_test()
+    else:
+        print("Invalid choice. Running SimpleMSO44B test...")
+        simple_mso44b_test()
+
 if __name__ == "__main__":
     main()
