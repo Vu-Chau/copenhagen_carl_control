@@ -1,0 +1,107 @@
+AFG31000 Function Generator
+===========================
+
+The AFG31000 class provides control for Tektronix AFG31000 series function generators.
+
+Basic Usage
+-----------
+
+.. code-block:: python
+
+   from AFG31000 import AFG31000
+
+   # Auto-discover and connect
+   afg = AFG31000()
+   
+   # Configure channel 1
+   afg.set_frequency(1, 1000)        # 1 kHz
+   afg.set_waveform_type(1, 'SQUare') # Square wave
+   afg.set_amplitude(1, 2.0)         # 2 Vpp
+   afg.set_offset(1, 0.0)            # 0V offset
+   afg.set_output(1, 'ON')           # Enable output
+   
+   # Clean up
+   afg.close()
+
+Key Features
+------------
+
+**Auto-Discovery**
+   Automatically finds connected AFG instruments via VISA.
+
+**Dual Channel Control**
+   Control both channels independently with different waveforms.
+
+**Multiple Waveforms**
+   Supports sine, square, pulse, ramp, noise, and more.
+
+**Load Impedance**
+   Set output load impedance (50Ω, 75Ω, high-Z, etc.).
+
+Common Methods
+--------------
+
+**Waveform Configuration:**
+
+.. code-block:: python
+
+   afg.set_waveform_type(channel, 'SINusoid')  # Sine wave
+   afg.set_frequency(channel, 10e3)            # 10 kHz
+   afg.set_amplitude(channel, 1.0)             # 1 Vpp
+   afg.set_offset(channel, 0.5)                # 0.5V offset
+
+**Output Control:**
+
+.. code-block:: python
+
+   afg.set_output(channel, 'ON')    # Enable output
+   afg.set_load(channel, 50)        # 50 ohm load
+   afg.set_phase(channel, 90, 'DEG') # 90 degree phase
+
+**Utility:**
+
+.. code-block:: python
+
+   device_id = afg.device_id()              # Get device info
+   instruments = AFG31000.list_all_instruments()  # List all instruments
+
+Available Waveforms
+-------------------
+
+- ``SINusoid`` - Sine wave
+- ``SQUare`` - Square wave  
+- ``PULSe`` - Pulse waveform
+- ``RAMP`` - Ramp/triangle wave
+- ``PRNoise`` - Pseudo-random noise
+- ``DC`` - DC level
+- ``SINC`` - Sinc function
+- ``GAUSsian`` - Gaussian pulse
+- ``LORentz`` - Lorentzian curve
+- ``EXPRise`` - Exponential rise
+- ``EXPDecay`` - Exponential decay
+- ``HAVersine`` - Haversine function
+
+Connection Options
+------------------
+
+.. code-block:: python
+
+   # Auto-discovery (recommended)
+   afg = AFG31000()
+   
+   # Specific IP address
+   afg = AFG31000(ip_address="192.168.1.100")
+   
+   # Serial port
+   afg = AFG31000(serial_port="COM1")
+   
+   # Direct VISA resource
+   afg = AFG31000(resource_name="USB0::0x0699::0x035E::C019451::INSTR")
+
+API Reference
+-------------
+
+.. automodule:: AFG31000
+   :members:
+   :undoc-members:
+   :show-inheritance:

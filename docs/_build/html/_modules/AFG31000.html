@@ -1,0 +1,590 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AFG31000 &mdash; Copenhagen Carl Control 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=8d563738"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Copenhagen Carl Control
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../afg31000.html">AFG31000 Function Generator</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mso44b.html">MSO44B Oscilloscope</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Usage Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API Reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Copenhagen Carl Control</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Module code</a></li>
+      <li class="breadcrumb-item active">AFG31000</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for AFG31000</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pyvisa</span>
+
+<div class="viewcode-block" id="AFG31000">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AFG31000</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resource_name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">serial_port</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ip_address</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">visa_address</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">5000</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the AFG31000 class with a resource name and optional serial port, ip address, or VISA address.</span>
+<span class="sd">        If all parameters are None, it will search for available AFG instruments automatically.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resource_name</span> <span class="o">=</span> <span class="n">resource_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">serial_port</span> <span class="o">=</span> <span class="n">serial_port</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ip_address</span> <span class="o">=</span> <span class="n">ip_address</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">visa_address</span> <span class="o">=</span> <span class="n">visa_address</span>
+        
+        <span class="c1"># Initialize the VISA resource manager</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rm</span> <span class="o">=</span> <span class="n">pyvisa</span><span class="o">.</span><span class="n">ResourceManager</span><span class="p">()</span>
+        
+        <span class="c1"># Open the connection to the device</span>
+        <span class="k">if</span> <span class="n">serial_port</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rm</span><span class="o">.</span><span class="n">open_resource</span><span class="p">(</span><span class="n">serial_port</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ip_address</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rm</span><span class="o">.</span><span class="n">open_resource</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;TCPIP::</span><span class="si">{</span><span class="n">ip_address</span><span class="si">}</span><span class="s1">::INSTR&#39;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">visa_address</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rm</span><span class="o">.</span><span class="n">open_resource</span><span class="p">(</span><span class="n">visa_address</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">resource_name</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rm</span><span class="o">.</span><span class="n">open_resource</span><span class="p">(</span><span class="n">resource_name</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># If all parameters are None, search for AFG instruments</span>
+            <span class="n">afg_resource</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_find_afg_instrument</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">afg_resource</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rm</span><span class="o">.</span><span class="n">open_resource</span><span class="p">(</span><span class="n">afg_resource</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">resource_name</span> <span class="o">=</span> <span class="n">afg_resource</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Automatically connected to AFG instrument at: </span><span class="si">{</span><span class="n">afg_resource</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No AFG instrument found. Please provide serial_port, ip_address, visa_address, or resource_name.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">timeout</span> <span class="o">=</span> <span class="n">timeout</span>
+
+        <span class="c1"># Configure serial settings if using serial connection</span>
+        <span class="c1"># if serial_port:</span>
+        <span class="c1">#     self.scope.baud_rate = 115200</span>
+        <span class="c1">#     self.scope.data_bits = 8</span>
+        <span class="c1">#     self.scope.parity = pyvisa.constants.Parity.none</span>
+        <span class="c1">#     self.scope.stop_bits = pyvisa.constants.StopBits.one</span>
+        <span class="c1">#     self.scope.flow_control = pyvisa.constants.VI_ASRL_FLOW_NONE</span>
+        <span class="c1"># Initialize the device</span>
+    
+    <span class="k">def</span><span class="w"> </span><span class="nf">_find_afg_instrument</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Find available AFG instruments by scanning all VISA resources.</span>
+<span class="sd">        </span>
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Resource name of the first AFG instrument found, or None if no AFG found</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Get list of all available resources</span>
+            <span class="n">resources</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rm</span><span class="o">.</span><span class="n">list_resources</span><span class="p">()</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">resources</span><span class="p">)</span><span class="si">}</span><span class="s2"> total instruments:&quot;</span><span class="p">)</span>
+            
+            <span class="n">afg_instruments</span> <span class="o">=</span> <span class="p">[]</span>
+            
+            <span class="k">for</span> <span class="n">resource</span> <span class="ow">in</span> <span class="n">resources</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Checking: </span><span class="si">{</span><span class="n">resource</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="c1"># Try to connect to each resource</span>
+                    <span class="n">temp_instrument</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rm</span><span class="o">.</span><span class="n">open_resource</span><span class="p">(</span><span class="n">resource</span><span class="p">)</span>
+                    <span class="n">temp_instrument</span><span class="o">.</span><span class="n">timeout</span> <span class="o">=</span> <span class="mi">2000</span>  <span class="c1"># Short timeout for discovery</span>
+                    
+                    <span class="c1"># Query device identification</span>
+                    <span class="n">device_id</span> <span class="o">=</span> <span class="n">temp_instrument</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;*IDN?&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    Device ID: </span><span class="si">{</span><span class="n">device_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    
+                    <span class="c1"># Check if this is an AFG instrument</span>
+                    <span class="k">if</span> <span class="s1">&#39;AFG&#39;</span> <span class="ow">in</span> <span class="n">device_id</span><span class="o">.</span><span class="n">upper</span><span class="p">():</span>
+                        <span class="n">afg_instruments</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                            <span class="s1">&#39;resource&#39;</span><span class="p">:</span> <span class="n">resource</span><span class="p">,</span>
+                            <span class="s1">&#39;device_id&#39;</span><span class="p">:</span> <span class="n">device_id</span>
+                        <span class="p">})</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    ✓ AFG instrument found!&quot;</span><span class="p">)</span>
+                    
+                    <span class="n">temp_instrument</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                    
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    ✗ Could not query </span><span class="si">{</span><span class="n">resource</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">temp_instrument</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                    <span class="k">except</span><span class="p">:</span>
+                        <span class="k">pass</span>
+                    <span class="k">continue</span>
+            
+            <span class="k">if</span> <span class="n">afg_instruments</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">afg_instruments</span><span class="p">)</span><span class="si">}</span><span class="s2"> AFG instrument(s):&quot;</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">instr</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">afg_instruments</span><span class="p">):</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">. </span><span class="si">{</span><span class="n">instr</span><span class="p">[</span><span class="s1">&#39;resource&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> - </span><span class="si">{</span><span class="n">instr</span><span class="p">[</span><span class="s1">&#39;device_id&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                
+                <span class="c1"># Return the first AFG instrument found</span>
+                <span class="n">selected</span> <span class="o">=</span> <span class="n">afg_instruments</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Using: </span><span class="si">{</span><span class="n">selected</span><span class="p">[</span><span class="s1">&#39;resource&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">selected</span><span class="p">[</span><span class="s1">&#39;resource&#39;</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">No AFG instruments found.&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">None</span>
+                
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error during instrument discovery: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        
+<div class="viewcode-block" id="AFG31000.device_id">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.device_id">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">device_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the device ID.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;*IDN?&#39;</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="AFG31000.check_device_id">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.check_device_id">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check_device_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if the device ID matches the expected value.</span>
+<span class="sd">        </span>
+<span class="sd">        Args:</span>
+<span class="sd">            strict (bool): If True, checks for specific model &#39;AFG31252&#39;.</span>
+<span class="sd">                          If False, checks for any AFG instrument.</span>
+<span class="sd">        </span>
+<span class="sd">        Returns:</span>
+<span class="sd">            bool: True if device ID matches expected pattern, False otherwise</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">device_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device_id</span><span class="p">()</span>
+        
+        <span class="k">if</span> <span class="n">strict</span><span class="p">:</span>
+            <span class="n">expected_id</span> <span class="o">=</span> <span class="s1">&#39;AFG31252&#39;</span>
+            <span class="k">if</span> <span class="n">expected_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">device_id</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Device ID mismatch: expected &#39;</span><span class="si">{</span><span class="n">expected_id</span><span class="si">}</span><span class="s2">&#39;, got &#39;</span><span class="si">{</span><span class="n">device_id</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Check for any AFG instrument</span>
+            <span class="k">if</span> <span class="s1">&#39;AFG&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">device_id</span><span class="o">.</span><span class="n">upper</span><span class="p">():</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Device ID mismatch: expected AFG instrument, got &#39;</span><span class="si">{</span><span class="n">device_id</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;AFG instrument detected: </span><span class="si">{</span><span class="n">device_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="kc">True</span></div>
+
+<div class="viewcode-block" id="AFG31000.write">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.write">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Write a command to the device.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">command</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="AFG31000.read">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.read">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Read a response from the device.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">read</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="AFG31000.query">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.query">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Send a command and read the response.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">command</span><span class="p">)</span></div>
+
+        <span class="c1"># Waveform Type Functions</span>
+<div class="viewcode-block" id="AFG31000.set_waveform_type">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.set_waveform_type">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_waveform_type</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel</span><span class="p">,</span> <span class="n">waveform_type</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set the waveform type for a specified channel.&quot;&quot;&quot;</span>
+        <span class="n">valid_types</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;SINusoid&#39;</span><span class="p">,</span> <span class="s1">&#39;SQUare&#39;</span><span class="p">,</span> <span class="s1">&#39;PULSe&#39;</span><span class="p">,</span> <span class="s1">&#39;RAMP&#39;</span><span class="p">,</span> <span class="s1">&#39;PRNoise&#39;</span><span class="p">,</span> <span class="s1">&#39;DC&#39;</span><span class="p">,</span> <span class="s1">&#39;SINC&#39;</span><span class="p">,</span> <span class="s1">&#39;GAUSsian&#39;</span><span class="p">,</span> <span class="s1">&#39;LORentz&#39;</span><span class="p">,</span> <span class="s1">&#39;EXPRise&#39;</span><span class="p">,</span> <span class="s1">&#39;EXPDecay&#39;</span><span class="p">,</span> <span class="s1">&#39;HAVersine&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">waveform_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">valid_types</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Waveform type must be one of </span><span class="si">{</span><span class="n">valid_types</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">channel</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Channel must be 1 or 2&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;SOURce</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:FUNCtion:SHAPe </span><span class="si">{</span><span class="n">waveform_type</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="AFG31000.get_waveform_type">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.get_waveform_type">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_waveform_type</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the waveform type for a specified channel.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">channel</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Channel must be 1 or 2&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;SOURce</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:FUNCtion:SHAPe?&#39;</span><span class="p">)</span></div>
+
+    
+    <span class="c1"># Frequency Functions</span>
+<div class="viewcode-block" id="AFG31000.set_frequency">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.set_frequency">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_frequency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel</span><span class="p">,</span> <span class="n">frequency</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set the frequency for a specified channel in Hz.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">channel</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Channel must be 1 or 2&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">frequency</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Frequency must be positive&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;SOURce</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:FREQuency </span><span class="si">{</span><span class="n">frequency</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="AFG31000.get_frequency">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.get_frequency">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_frequency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the frequency for a specified channel.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">channel</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Channel must be 1 or 2&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;SOURce</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:FREQuency?&#39;</span><span class="p">))</span></div>
+
+    
+    <span class="c1"># Amplitude Functions</span>
+<div class="viewcode-block" id="AFG31000.set_amplitude">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.set_amplitude">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_amplitude</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel</span><span class="p">,</span> <span class="n">amplitude</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set the amplitude for a specified channel in Volts peak-to-peak.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">channel</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Channel must be 1 or 2&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">amplitude</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Amplitude must be non-negative&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;SOURce</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:VOLTage:LEVel:IMMediate:AMPLitude </span><span class="si">{</span><span class="n">amplitude</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="AFG31000.get_amplitude">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.get_amplitude">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_amplitude</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the amplitude for a specified channel.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">channel</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Channel must be 1 or 2&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;SOURce</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:VOLTage:LEVel:IMMediate:AMPLitude?&#39;</span><span class="p">))</span></div>
+
+    
+    <span class="c1"># Offset Functions</span>
+<div class="viewcode-block" id="AFG31000.set_offset">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.set_offset">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_offset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel</span><span class="p">,</span> <span class="n">offset</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set the DC offset for a specified channel in Volts.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">channel</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Channel must be 1 or 2&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;SOURce</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:VOLTage:LEVel:IMMediate:OFFSet </span><span class="si">{</span><span class="n">offset</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="AFG31000.get_offset">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.get_offset">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_offset</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the DC offset for a specified channel.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">channel</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Channel must be 1 or 2&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;SOURce</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:VOLTage:LEVel:IMMediate:OFFSet?&#39;</span><span class="p">))</span></div>
+
+    
+    <span class="c1"># Load Functions</span>
+<div class="viewcode-block" id="AFG31000.set_load">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.set_load">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel</span><span class="p">,</span> <span class="n">impedance</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set the load impedance for a specified channel in Ohms.</span>
+<span class="sd">        </span>
+<span class="sd">        Args:</span>
+<span class="sd">            channel: Channel number (1 or 2)</span>
+<span class="sd">            impedance: Load impedance value. Can be:</span>
+<span class="sd">                      - Numeric value (int/float) between 1 and 10000 Ohms</span>
+<span class="sd">                      - Numeric string (e.g., &quot;50&quot;, &quot;75&quot;) between 1 and 10000 Ohms</span>
+<span class="sd">                      - &quot;INFinity&quot; for &gt;10 kΩ (high impedance)</span>
+<span class="sd">                      - &quot;MINimum&quot; for 1 Ω</span>
+<span class="sd">                      - &quot;MAXimum&quot; for 10 kΩ</span>
+<span class="sd">                      - &quot;HIGHZ&quot; (alias for INFinity)</span>
+<span class="sd">                      </span>
+<span class="sd">        The device has 1 Ω resolution with 3 significant digits. Default is 50 Ω.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">channel</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Channel must be 1 or 2&quot;</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">impedance</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="c1"># First check if it&#39;s a numeric string</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">impedance_val</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">impedance</span><span class="p">)</span>
+                <span class="c1"># If it&#39;s a valid number, validate the range</span>
+                <span class="k">if</span> <span class="n">impedance_val</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">impedance_val</span> <span class="o">&gt;</span> <span class="mi">10000</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Numeric impedance must be between 1 and 10000 Ohms&quot;</span><span class="p">)</span>
+                <span class="n">impedance</span> <span class="o">=</span> <span class="n">impedance_val</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="c1"># Not a numeric string, check if it&#39;s a valid keyword</span>
+                <span class="n">impedance_upper</span> <span class="o">=</span> <span class="n">impedance</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">impedance_upper</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;HIGHZ&quot;</span><span class="p">,</span> <span class="s2">&quot;INFINITY&quot;</span><span class="p">,</span> <span class="s2">&quot;INF&quot;</span><span class="p">]:</span>
+                    <span class="n">impedance</span> <span class="o">=</span> <span class="s2">&quot;INFinity&quot;</span>
+                <span class="k">elif</span> <span class="n">impedance_upper</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;MINIMUM&quot;</span><span class="p">,</span> <span class="s2">&quot;MIN&quot;</span><span class="p">]:</span>
+                    <span class="n">impedance</span> <span class="o">=</span> <span class="s2">&quot;MINimum&quot;</span>
+                <span class="k">elif</span> <span class="n">impedance_upper</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;MAXIMUM&quot;</span><span class="p">,</span> <span class="s2">&quot;MAX&quot;</span><span class="p">]:</span>
+                    <span class="n">impedance</span> <span class="o">=</span> <span class="s2">&quot;MAXimum&quot;</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid impedance value &#39;</span><span class="si">{</span><span class="n">impedance</span><span class="si">}</span><span class="s2">&#39;. Must be a number (1-10000) or one of: INFinity, MINimum, MAXimum, HIGHZ&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Numeric value validation</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">impedance_val</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">impedance</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">impedance_val</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">impedance_val</span> <span class="o">&gt;</span> <span class="mi">10000</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Numeric impedance must be between 1 and 10000 Ohms&quot;</span><span class="p">)</span>
+                <span class="n">impedance</span> <span class="o">=</span> <span class="n">impedance_val</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Impedance must be a number between 1-10000 Ohms or one of: INFinity, MINimum, MAXimum, HIGHZ&quot;</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;OUTPut</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:IMP </span><span class="si">{</span><span class="n">impedance</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="AFG31000.get_load">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.get_load">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the load impedance for a specified channel.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">channel</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Channel must be 1 or 2&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;OUTPut</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:IMP?&#39;</span><span class="p">)</span></div>
+
+    
+    <span class="c1"># Output State Functions</span>
+<div class="viewcode-block" id="AFG31000.set_output">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.set_output">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_output</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set the output state for a specified channel.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">channel</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Channel must be 1 or 2&quot;</span><span class="p">)</span>
+        
+        <span class="c1"># Normalize string inputs to uppercase for comparison</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">state_upper</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">state_upper</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;ON&#39;</span><span class="p">,</span> <span class="s1">&#39;OFF&#39;</span><span class="p">]:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;State must be &#39;ON&#39;, &#39;OFF&#39; (case insensitive), True, False, 1, or 0&quot;</span><span class="p">)</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="n">state_upper</span>
+        <span class="k">elif</span> <span class="n">state</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;State must be &#39;ON&#39;, &#39;OFF&#39; (case insensitive), True, False, 1, or 0&quot;</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">state</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;ON&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="mi">1</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;OUTPut</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:STATe ON&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;OUTPut</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:STATe OFF&#39;</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="AFG31000.get_output">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.get_output">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_output</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the output state for a specified channel.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">channel</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Channel must be 1 or 2&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;OUTPut</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:STATe?&#39;</span><span class="p">)</span></div>
+
+    
+    <span class="c1"># Frequency Lock Functions</span>
+<div class="viewcode-block" id="AFG31000.set_frequency_lock">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.set_frequency_lock">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_frequency_lock</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set the frequency lock state for both channels.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">state</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;ON&#39;</span><span class="p">,</span> <span class="s1">&#39;OFF&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;State must be &#39;ON&#39;, &#39;OFF&#39;, True, False, 1, or 0&quot;</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">state</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;ON&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="mi">1</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;SOURce:FREQuency:CONCurrent ON&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;SOURce:FREQuency:CONCurrent OFF&#39;</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="AFG31000.get_frequency_lock">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.get_frequency_lock">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_frequency_lock</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the frequency lock state.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;SOURce:FREQuency:CONCurrent?&#39;</span><span class="p">)</span></div>
+
+    
+    <span class="c1"># Phase Functions</span>
+<div class="viewcode-block" id="AFG31000.set_phase">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.set_phase">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_phase</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel</span><span class="p">,</span> <span class="n">phase</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s1">&#39;DEG&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set the phase for a specified channel.</span>
+<span class="sd">        </span>
+<span class="sd">        Args:</span>
+<span class="sd">            channel: Channel number (1 or 2)</span>
+<span class="sd">            phase: Phase value</span>
+<span class="sd">            unit: &#39;DEG&#39; for degrees (default) or &#39;RAD&#39; for radians</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">channel</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Channel must be 1 or 2&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">unit</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;DEG&#39;</span><span class="p">,</span> <span class="s1">&#39;RAD&#39;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unit must be &#39;DEG&#39; or &#39;RAD&#39;&quot;</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">unit</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;DEG&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="o">-</span><span class="mi">360</span> <span class="o">&lt;=</span> <span class="n">phase</span> <span class="o">&lt;=</span> <span class="mi">360</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Phase must be between -360 and 360 degrees&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;SOURce</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:PHASe:ADJust </span><span class="si">{</span><span class="n">phase</span><span class="si">}</span><span class="s1">DEG&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># RAD</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="o">-</span><span class="mf">6.28</span> <span class="o">&lt;=</span> <span class="n">phase</span> <span class="o">&lt;=</span> <span class="mf">6.28</span><span class="p">:</span>  <span class="c1"># approximately -2π to 2π</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Phase must be between -2π and 2π radians&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;SOURce</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:PHASe:ADJust </span><span class="si">{</span><span class="n">phase</span><span class="si">}</span><span class="s1">RAD&#39;</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="AFG31000.get_phase">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.get_phase">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_phase</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">channel</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s1">&#39;DEG&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the phase for a specified channel.</span>
+<span class="sd">        </span>
+<span class="sd">        Args:</span>
+<span class="sd">            channel: Channel number (1 or 2)</span>
+<span class="sd">            unit: &#39;DEG&#39; for degrees (default) or &#39;RAD&#39; for radians</span>
+<span class="sd">            </span>
+<span class="sd">        Returns:</span>
+<span class="sd">            Phase value in the requested unit</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">channel</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Channel must be 1 or 2&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">unit</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;DEG&#39;</span><span class="p">,</span> <span class="s1">&#39;RAD&#39;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unit must be &#39;DEG&#39; or &#39;RAD&#39;&quot;</span><span class="p">)</span>
+        
+        <span class="c1"># Query the phase value (device may return in any unit)</span>
+        <span class="n">phase_response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;SOURce</span><span class="si">{</span><span class="n">channel</span><span class="si">}</span><span class="s1">:PHASe:ADJust?&#39;</span><span class="p">)</span>
+        <span class="n">phase_value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">phase_response</span><span class="p">)</span>
+        
+        <span class="c1"># Detect if the returned value is in radians or degrees</span>
+        <span class="n">is_radians</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">phase_value</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mf">6.28</span>  <span class="c1"># 2π ≈ 6.28</span>
+        
+        <span class="k">if</span> <span class="n">unit</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;DEG&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">is_radians</span><span class="p">:</span>
+                <span class="c1"># Convert from radians to degrees</span>
+                <span class="k">return</span> <span class="n">phase_value</span> <span class="o">*</span> <span class="mi">180</span> <span class="o">/</span> <span class="mf">3.14159265359</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Already in degrees</span>
+                <span class="k">return</span> <span class="n">phase_value</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># RAD</span>
+            <span class="k">if</span> <span class="n">is_radians</span><span class="p">:</span>
+                <span class="c1"># Already in radians</span>
+                <span class="k">return</span> <span class="n">phase_value</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Convert from degrees to radians</span>
+                <span class="k">return</span> <span class="n">phase_value</span> <span class="o">*</span> <span class="mf">3.14159265359</span> <span class="o">/</span> <span class="mi">180</span></div>
+
+    
+<div class="viewcode-block" id="AFG31000.close">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.close">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Close the connection to the device.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rm</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+
+    
+<div class="viewcode-block" id="AFG31000.list_all_instruments">
+<a class="viewcode-back" href="../afg31000.html#AFG31000.AFG31000.list_all_instruments">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">list_all_instruments</span><span class="p">():</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;List all available VISA instruments with their device IDs.</span>
+<span class="sd">        </span>
+<span class="sd">        Returns:</span>
+<span class="sd">            list: List of dictionaries containing &#39;resource&#39; and &#39;device_id&#39; keys</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">rm</span> <span class="o">=</span> <span class="n">pyvisa</span><span class="o">.</span><span class="n">ResourceManager</span><span class="p">()</span>
+        <span class="n">instruments</span> <span class="o">=</span> <span class="p">[]</span>
+        
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">resources</span> <span class="o">=</span> <span class="n">rm</span><span class="o">.</span><span class="n">list_resources</span><span class="p">()</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Scanning </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">resources</span><span class="p">)</span><span class="si">}</span><span class="s2"> available instruments:&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+            
+            <span class="k">for</span> <span class="n">resource</span> <span class="ow">in</span> <span class="n">resources</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">temp_instrument</span> <span class="o">=</span> <span class="n">rm</span><span class="o">.</span><span class="n">open_resource</span><span class="p">(</span><span class="n">resource</span><span class="p">)</span>
+                    <span class="n">temp_instrument</span><span class="o">.</span><span class="n">timeout</span> <span class="o">=</span> <span class="mi">2000</span>
+                    
+                    <span class="n">device_id</span> <span class="o">=</span> <span class="n">temp_instrument</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;*IDN?&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                    <span class="n">is_afg</span> <span class="o">=</span> <span class="s1">&#39;AFG&#39;</span> <span class="ow">in</span> <span class="n">device_id</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                    
+                    <span class="n">instruments</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                        <span class="s1">&#39;resource&#39;</span><span class="p">:</span> <span class="n">resource</span><span class="p">,</span>
+                        <span class="s1">&#39;device_id&#39;</span><span class="p">:</span> <span class="n">device_id</span><span class="p">,</span>
+                        <span class="s1">&#39;is_afg&#39;</span><span class="p">:</span> <span class="n">is_afg</span>
+                    <span class="p">})</span>
+                    
+                    <span class="n">status</span> <span class="o">=</span> <span class="s2">&quot;AFG ✓&quot;</span> <span class="k">if</span> <span class="n">is_afg</span> <span class="k">else</span> <span class="s2">&quot;Other&quot;</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">resource</span><span class="si">:</span><span class="s2">&lt;25</span><span class="si">}</span><span class="s2"> | </span><span class="si">{</span><span class="n">status</span><span class="si">:</span><span class="s2">&lt;6</span><span class="si">}</span><span class="s2"> | </span><span class="si">{</span><span class="n">device_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    
+                    <span class="n">temp_instrument</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                    
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">resource</span><span class="si">:</span><span class="s2">&lt;25</span><span class="si">}</span><span class="s2"> | Error  | Could not query: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">temp_instrument</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                    <span class="k">except</span><span class="p">:</span>
+                        <span class="k">pass</span>
+            
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+            <span class="n">afg_count</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">instr</span> <span class="ow">in</span> <span class="n">instruments</span> <span class="k">if</span> <span class="n">instr</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;is_afg&#39;</span><span class="p">,</span> <span class="kc">False</span><span class="p">))</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total instruments: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">instruments</span><span class="p">)</span><span class="si">}</span><span class="s2">, AFG instruments: </span><span class="si">{</span><span class="n">afg_count</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error during instrument scan: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">rm</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        
+        <span class="k">return</span> <span class="n">instruments</span></div>
+</div>
+
+    
+    
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, VC.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
