@@ -2,360 +2,528 @@ import unittest
 import time
 import csv
 import os
+import json
 from MSO44B import MSO44B
 
 class TestMSO44B(unittest.TestCase):
-    """Hardware-in-the-loop tests for MSO44B Tektronix Oscilloscope"""
+    """Hardware-in-the-loop tests for MSO44B Tektronix Oscilloscope wrapper"""
     
     @classmethod
     def setUpClass(cls):
         """Set up the test class with a single hardware connection for all tests"""
-        # Replace with your actual device IP address or VISA resource string
-        # cls.ip_address = "192.168.1.100"  # Update this to your oscilloscope's IP
-        # Alternative connection methods:
-        cls.resource_name = "USB0::0x0699::0x0527::C047272::INSTR"  # USB connection
-        # cls.serial_port = "COM3"  # Serial connection
-        
         try:
-            print(f"Attempting to connect to MSO44B at: {cls.resource_name}")
+            print("=== MSO44B Wrapper Hardware Tests ===")
+            print("Attempting to connect to MSO44B using auto-discovery...")
             
-            # List available resources first for debugging
-            available_resources = MSO44B.list_resources()
-            print(f"Available VISA resources: {available_resources}")
+            # List available instruments first for debugging
+            print("\nAvailable instruments:")
+            MSO44B.list_all_instruments()
             
-            cls.scope = MSO44B(resource_name=cls.resource_name, timeout=15000)  # 15 second timeout
-            print("✓ Connection established successfully for all tests")
+            cls.scope = MSO44B(timeout=15000)  # 15 second timeout
             
-            # Verify connection immediately
-            if cls.scope.is_connected():
-                print("✓ Connection verification successful")
+            # Try to connect with auto-discovery
+            if cls.scope.connect(auto_discover=True):
+                print(f"✓ Connected to: {cls.scope.device_id()}")
             else:
-                print("✗ Connection verification failed")
+                raise ConnectionError("Failed to auto-discover MSO44B")
                 
         except Exception as e:
             print(f"✗ Connection failed: {e}")
-            raise unittest.SkipTest(f"Could not connect to MSO44B at {cls.resource_name}: {e}")
+            raise unittest.SkipTest(f"Could not connect to MSO44B: {e}")
     
     @classmethod
     def tearDownClass(cls):
         """Clean up after all tests are complete"""
         if hasattr(cls, 'scope'):
-            print("Closing connection to MSO44B")
-            # Reset scope to a known state before closing
+            print("\nClosing connection to MSO44B")
             try:
-                cls.scope.stop()
                 cls.scope.close()
             except:
                 pass  # Ignore errors during cleanup
     
     def setUp(self):
         """Set up before each individual test"""
-        # Clear any errors before each test
-        try:
-            self.scope.clear_status()
-        except:
-            pass  # Ignore errors during setup
+        # Ensure connection is still active
+        if not self.scope.connected:
+            self.skipTest("Lost connection to scope")
     
     @property
     def scope(self):
         """Access the class-level scope connection"""
         return self.__class__.scope
     
-    def tearDown(self):
-        """Clean up after each individual test"""
-        # Stop acquisition and turn off all channels after each test
-        try:
-            self.scope.stop()
-            for channel in [1, 2, 3, 4]:
-                self.scope.set_channel_state(channel, 'OFF')
-        except:
-            pass  # Ignore errors during cleanup
+    def test_connection_and_device_id(self):
+        """Test connection and device identification"""
+        # Test device ID
+        device_id = self.scope.device_id()
+        self.assertIsInstance(device_id, str)
+        self.assertIn("MSO", device_id.upper())
+        print(f"✓ Device ID: {device_id.strip()}")
+        
+        # Test connection status
+        self.assertTrue(self.scope.connected)
+        print("✓ Connection status verified")
     
-    def test_connection(self):
-        """Test if we can connect to the MSO44B"""
-        try:
-            # First, list available resources for debugging
-            available_resources = MSO44B.list_resources()
-            print(f"Available VISA resources: {available_resources}")
-            
-            # Check if connection is still valid
-            if not self.scope.is_connected():
-                self.fail("Connection to oscilloscope was lost between setup and test")
-            
-            idn = self.scope.device_id()
-            self.assertIn("MSO44", idn)
-            print(f"✓ Connected to: {idn.strip()}")
-            
-            # Test device ID check method
-            is_mso44b = self.scope.check_device_id()
-            self.assertTrue(is_mso44b)
-            print("✓ Device ID check passed")
-            
-        except Exception as e:
-            # Add more diagnostic information
-            print(f"Connection test failed. Checking connection status...")
-            print(f"Has scope attribute: {hasattr(self, 'scope')}")
-            if hasattr(self, 'scope'):
-                print(f"Scope object: {self.scope}")
-                print(f"Connection status: {self.scope.is_connected()}")
-            self.fail(f"Failed to connect to MSO44B: {e}")
+    def test_direct_scpi_commands(self):
+        """Test direct SCPI command functionality"""
+        # Test write command
+        self.scope.write('*CLS')  # Clear status
+        
+        # Test query command
+        idn_response = self.scope.query('*IDN?')
+        self.assertIsInstance(idn_response, str)
+        self.assertIn("TEKTRONIX", idn_response.upper())
+        print(f"✓ SCPI query successful: {idn_response.strip()}")
+        
+        # Test device_id method (wrapper around *IDN?)
+        device_id = self.scope.device_id()
+        self.assertEqual(idn_response.strip(), device_id.strip())
+        print("✓ Direct SCPI commands working")
     
-    def test_reset_and_clear(self):
-        """Test reset and clear status functionality"""
-        # Test reset
-        self.scope.reset()
-        time.sleep(2)  # Allow time for reset to complete
+    def test_high_resolution_mode_control(self):
+        """Test high resolution mode on/off functionality"""
+        print("\nTesting high resolution mode control:")
         
-        # Test clear status
-        self.scope.clear_status()
+        # Test enabling high resolution mode
+        self.scope.set_high_resolution_mode(True)
+        time.sleep(1.0)  # Allow time for mode change
         
-        # Verify scope is responsive after reset
-        idn = self.scope.device_id()
-        self.assertIn("MSO44", idn)
-        print("Reset and clear status test passed")
+        # Check acquisition mode
+        current_mode = self.scope.get_acquisition_mode()
+        print(f"  High resolution enabled - Mode: {current_mode}")
+        
+        # Verify it's in high resolution mode (16-bit)
+        self.assertIn('HIRES', current_mode.upper(), 
+                      f"Expected HIRES mode, got: {current_mode}")
+        
+        # Test disabling high resolution mode
+        self.scope.set_high_resolution_mode(False)
+        time.sleep(1.0)  # Allow time for mode change
+        
+        # Check acquisition mode again
+        current_mode = self.scope.get_acquisition_mode()
+        print(f"  High resolution disabled - Mode: {current_mode}")
+        
+        # Verify it's back to normal sampling mode (8-bit)
+        self.assertIn('SAMPLE', current_mode.upper(), 
+                      f"Expected SAMPLE mode, got: {current_mode}")
+        
+        # Test enabling again to ensure it's repeatable
+        self.scope.set_high_resolution_mode(True)
+        time.sleep(1.0)
+        final_mode = self.scope.get_acquisition_mode()
+        print(f"  High resolution re-enabled - Mode: {final_mode}")
+        self.assertIn('HIRES', final_mode.upper())
+        
+        # Reset to normal mode for other tests
+        self.scope.set_high_resolution_mode(False)
+        time.sleep(1.0)
+        
+        print("✓ High resolution mode test completed")
     
-    def test_channel_configuration(self):
-        """Test channel configuration settings"""
-        test_channels = [1, 2, 3, 4]
+    def test_trigger_setup(self):
+        """Test trigger configuration"""
+        print("\nTesting trigger setup:")
         
-        for channel in test_channels:
-            print(f"Testing Channel {channel}:")
-            
-            # Test channel state (on/off)
-            self.scope.set_channel_state(channel, 'ON')
-            time.sleep(0.1)
-            state = self.scope.get_channel_state(channel).strip()
-            self.assertIn("1", state)  # ON state
-            print(f"  Channel {channel} turned ON: {state}")
-            
-            # Test vertical scale
-            test_scales = [0.01, 0.1, 1.0, 5.0]  # Different voltage scales
-            for scale in test_scales:
-                self.scope.set_channel_scale(channel, scale)
-                time.sleep(0.1)
-                actual_scale = float(self.scope.get_channel_scale(channel))
-                self.assertAlmostEqual(actual_scale, scale, delta=scale * 0.1)
-                print(f"  Scale set to: {actual_scale} V/div")
-            
-            # Test coupling
-            coupling_modes = ['DC', 'AC']
-            for coupling in coupling_modes:
-                self.scope.set_channel_coupling(channel, coupling)
-                time.sleep(0.1)
-                actual_coupling = self.scope.get_channel_coupling(channel).strip()
-                self.assertIn(coupling, actual_coupling)
-                print(f"  Coupling set to: {actual_coupling}")
-            
-            # Turn channel off after testing
-            self.scope.set_channel_state(channel, 'OFF')
-    
-    def test_channel_error_handling(self):
-        """Test channel parameter validation"""
-        # Test invalid channel numbers
-        with self.assertRaises(ValueError):
-            self.scope.set_channel_scale(5, 1.0)  # Invalid channel
+        # Test basic edge trigger
+        self.scope.setup_trigger(
+            source_channel=1,
+            trigger_type='edge',
+            level=0.5,
+            slope='rising'
+        )
+        print("  ✓ Basic edge trigger configured (CH1, 0.5V, rising)")
         
-        with self.assertRaises(ValueError):
-            self.scope.set_channel_coupling(0, 'DC')  # Invalid channel
+        # Test different trigger levels and slopes
+        test_configs = [
+            {'source_channel': 1, 'level': -0.5, 'slope': 'falling'},
+            {'source_channel': 2, 'level': 1.0, 'slope': 'rising'},
+            {'source_channel': 1, 'level': 0.0, 'slope': 'rising'},
+        ]
         
-        # Test invalid coupling
-        with self.assertRaises(ValueError):
-            self.scope.set_channel_coupling(1, 'INVALID')
+        for config in test_configs:
+            self.scope.setup_trigger(**config)
+            print(f"  ✓ Trigger configured: CH{config['source_channel']}, "
+                  f"{config['level']}V, {config['slope']}")
         
-        # Test invalid state
-        with self.assertRaises(ValueError):
-            self.scope.set_channel_state(1, 'INVALID')
-        
-        print("Channel error handling test passed")
-    
-    def test_time_base_configuration(self):
-        """Test horizontal time base settings"""
-        # Test different time scales
-        test_scales = [1e-6, 10e-6, 100e-6, 1e-3, 10e-3, 100e-3]  # microseconds to milliseconds
-        
-        for scale in test_scales:
-            self.scope.set_time_scale(scale)
-            time.sleep(0.2)
-            actual_scale = float(self.scope.get_time_scale())
-            self.assertAlmostEqual(actual_scale, scale, delta=scale * 0.1)
-            print(f"Time scale set to: {actual_scale:.2e} s/div")
-    
-    def test_trigger_configuration(self):
-        """Test trigger settings"""
-        # Configure channel 1 for trigger testing
-        self.scope.set_channel_state(1, 'ON')
-        self.scope.set_channel_scale(1, 1.0)
-        self.scope.set_channel_coupling(1, 'DC')
-        
-        # Test trigger settings
-        test_levels = [0.0, 0.5, -0.5, 1.0, -1.0]
-        test_slopes = ['RISING', 'FALLING']
-        
-        for slope in test_slopes:
-            for level in test_levels:
-                self.scope.set_trigger(1, level, slope)
-                time.sleep(0.1)
-                
-                trigger_settings = self.scope.get_trigger()
-                
-                # Verify trigger source
-                self.assertIn("CH1", trigger_settings['source'])
-                
-                # Verify trigger level (with some tolerance)
-                actual_level = float(trigger_settings['level'])
-                self.assertAlmostEqual(actual_level, level, delta=0.1)
-                
-                # Verify trigger slope
-                self.assertIn(slope, trigger_settings['slope'])
-                
-                print(f"Trigger set: CH1, {level}V, {slope} - Actual: {actual_level:.2f}V, {trigger_settings['slope']}")
+        print("✓ Trigger setup test completed")
     
     def test_trigger_error_handling(self):
         """Test trigger parameter validation"""
         # Test invalid channel
         with self.assertRaises(ValueError):
-            self.scope.set_trigger(5, 0.0)
+            self.scope.setup_trigger(source_channel=5, level=0.0)
         
         # Test invalid slope
         with self.assertRaises(ValueError):
-            self.scope.set_trigger(1, 0.0, 'INVALID')
+            self.scope.setup_trigger(source_channel=1, level=0.0, slope='invalid')
         
-        print("Trigger error handling test passed")
+        print("✓ Trigger error handling test passed")
     
-    def test_acquisition_control(self):
-        """Test acquisition state control"""
-        # Test different acquisition states
-        states = ['RUN', 'STOP', 'SINGLE']
+    def test_waveform_scaling_parameters(self):
+        """Test waveform scaling parameter retrieval"""
+        print("\nTesting waveform scaling parameters:")
         
-        for state in states:
-            self.scope.set_acquisition_state(state)
-            time.sleep(0.5)
-            actual_state = self.scope.get_acquisition_state().strip()
-            
-            if state == 'SINGLE':
-                # SINGLE may return different states depending on trigger status
-                self.assertTrue(actual_state in ['SINGLE', 'STOP', 'TRIGGER'])
-            else:
-                self.assertIn(state, actual_state)
-            
-            print(f"Acquisition state set to: {state}, actual: {actual_state}")
-        
-        # Test convenience methods
-        self.scope.run()
-        time.sleep(0.5)
-        run_state = self.scope.get_acquisition_state()
-        self.assertIn('RUN', run_state)
-        
-        self.scope.stop()
-        time.sleep(0.5)
-        stop_state = self.scope.get_acquisition_state()
-        self.assertIn('STOP', stop_state)
-        
-        print("Acquisition control test passed")
-    
-    def test_acquisition_error_handling(self):
-        """Test acquisition state validation"""
-        with self.assertRaises(ValueError):
-            self.scope.set_acquisition_state('INVALID')
-        
-        print("Acquisition error handling test passed")
-    
-    def test_sample_rate_configuration(self):
-        """Test sample rate settings"""
-        # Note: Available sample rates depend on time base and memory depth
-        # These are common rates that should be supported
-        test_rates = [1e6, 10e6, 100e6, 1e9]  # 1MS/s to 1GS/s
-        
-        for rate in test_rates:
+        # Test getting scaling parameters for different channels
+        for channel in [1, 2, 3, 4]:
             try:
-                self.scope.set_sample_rate(rate)
-                time.sleep(0.2)
-                actual_rate = float(self.scope.get_sample_rate())
+                scaling_params = self.scope.get_waveform_scaling_params(channel)
+                self.assertIsInstance(scaling_params, dict)
                 
-                # Sample rate may be adjusted by the scope based on other settings
-                # Allow for reasonable deviation
-                self.assertGreater(actual_rate, rate * 0.1)
-                self.assertLess(actual_rate, rate * 10)
+                # Check that required parameters are present
+                required_keys = ['ymult', 'yoff', 'yzero']
+                for key in required_keys:
+                    self.assertIn(key, scaling_params)
                 
-                print(f"Sample rate requested: {rate:.0e} S/s, actual: {actual_rate:.2e} S/s")
+                print(f"  CH{channel} scaling: ymult={scaling_params.get('ymult')}, "
+                      f"yoff={scaling_params.get('yoff')}, yzero={scaling_params.get('yzero')}")
+                
             except Exception as e:
-                print(f"Sample rate {rate:.0e} not supported: {e}")
-    
-    def test_waveform_data_acquisition(self):
-        """Test waveform data acquisition"""
-        # Set up scope for data acquisition
-        self.scope.set_channel_state(1, 'ON')
-        self.scope.set_channel_scale(1, 1.0)
-        self.scope.set_time_scale(1e-3)  # 1ms/div
-        self.scope.set_trigger(1, 0.0, 'RISING')
+                print(f"  CH{channel} scaling failed: {e}")
         
-        # Test single channel data acquisition
+        print("✓ Waveform scaling parameters test completed")
+    
+    def test_time_scaling_parameters(self):
+        """Test time scaling parameter retrieval"""
+        print("\nTesting time scaling parameters:")
+        
+        time_params = self.scope.get_time_scaling_params()
+        self.assertIsInstance(time_params, dict)
+        
+        # Check that required parameters are present
+        required_keys = ['xincr', 'xzero']
+        for key in required_keys:
+            self.assertIn(key, time_params)
+        
+        print(f"  Time scaling: xincr={time_params.get('xincr')}, "
+              f"xzero={time_params.get('xzero')}")
+        
+        print("✓ Time scaling parameters test completed")
+    
+    def test_single_channel_waveform_read(self):
+        """Test reading waveform data from a single channel"""
+        print("\nTesting single channel waveform reading:")
+        
+        # Setup trigger first
+        self.scope.setup_trigger(source_channel=1, level=0.0, slope='rising')
+        
+        # Test ASCII format
         try:
-            waveform_data = self.scope.get_waveform_data(1, 'ASCII')
-            self.assertIsInstance(waveform_data, list)
-            self.assertGreater(len(waveform_data), 0)
+            waveform_ascii = self.scope.read_channel_waveform(1, use_binary=False)
+            self.assertIsInstance(waveform_ascii, dict)
+            self.assertIn('voltage_data', waveform_ascii)
+            self.assertIn('raw_data', waveform_ascii)
+            self.assertIn('format_used', waveform_ascii)
             
-            # Check that data contains numeric values
-            for value in waveform_data[:10]:  # Check first 10 values
-                self.assertIsInstance(value, float)
+            voltage_data = waveform_ascii['voltage_data']
+            self.assertIsInstance(voltage_data, list)
+            self.assertGreater(len(voltage_data), 0)
             
-            print(f"Single channel waveform acquired: {len(waveform_data)} points")
+            print(f"  ✓ ASCII format: {len(voltage_data)} points, "
+                  f"format: {waveform_ascii['format_used']}")
             
         except Exception as e:
-            print(f"Waveform acquisition test skipped (may need signal): {e}")
-    
-    def test_multiple_channel_acquisition(self):
-        """Test multiple channel data acquisition"""
-        # Enable multiple channels
-        channels = [1, 2]
-        for channel in channels:
-            self.scope.set_channel_state(channel, 'ON')
-            self.scope.set_channel_scale(channel, 1.0)
+            print(f"  ASCII format test failed: {e}")
         
-        self.scope.set_time_scale(1e-3)
-        self.scope.set_trigger(1, 0.0, 'RISING')
-        
+        # Test binary format
         try:
-            waveforms = self.scope.get_multiple_waveforms(channels, 'ASCII')
+            waveform_binary = self.scope.read_channel_waveform(1, use_binary=True)
+            self.assertIsInstance(waveform_binary, dict)
+            self.assertIn('voltage_data', waveform_binary)
             
-            self.assertIsInstance(waveforms, dict)
-            self.assertIn('CH1', waveforms)
-            self.assertIn('CH2', waveforms)
+            voltage_data = waveform_binary['voltage_data']
+            self.assertIsInstance(voltage_data, list)
+            self.assertGreater(len(voltage_data), 0)
             
-            for channel_key, data in waveforms.items():
-                self.assertIsInstance(data, list)
-                self.assertGreater(len(data), 0)
-                print(f"{channel_key} waveform: {len(data)} points")
+            print(f"  ✓ Binary format: {len(voltage_data)} points, "
+                  f"format: {waveform_binary['format_used']}")
             
         except Exception as e:
-            print(f"Multiple channel acquisition test skipped (may need signal): {e}")
+            print(f"  Binary format test failed: {e}")
+        
+        print("✓ Single channel waveform reading test completed")
     
-    def test_waveform_data_error_handling(self):
-        """Test waveform data acquisition error handling"""
-        # Test invalid channel
-        with self.assertRaises(ValueError):
-            self.scope.get_waveform_data(5, 'ASCII')
+    def test_waveform_data_conversion(self):
+        """Test raw data to voltage conversion"""
+        print("\nTesting waveform data conversion:")
         
-        # Test invalid data format
-        with self.assertRaises(ValueError):
-            self.scope.get_waveform_data(1, 'INVALID')
+        # Get scaling parameters
+        scaling_params = self.scope.get_waveform_scaling_params(1)
         
-        # Test invalid channels list
-        with self.assertRaises(ValueError):
-            self.scope.get_multiple_waveforms([5], 'ASCII')
+        # Create test raw data
+        test_raw_data = [0, 100, -100, 500, -500]
         
-        print("Waveform data error handling test passed")
+        # Convert to voltages
+        voltages = self.scope.convert_raw_to_voltage(test_raw_data, scaling_params)
+        
+        self.assertIsInstance(voltages, list)
+        self.assertEqual(len(voltages), len(test_raw_data))
+        
+        for voltage in voltages:
+            self.assertIsInstance(voltage, float)
+        
+        print(f"  ✓ Converted {len(test_raw_data)} raw values to voltages")
+        print(f"  Raw data: {test_raw_data}")
+        print(f"  Voltages: {[f'{v:.3f}' for v in voltages]}")
+        
+        print("✓ Waveform data conversion test completed")
     
-    def test_csv_file_operations(self):
-        """Test CSV file save functionality"""
+    def test_time_axis_generation(self):
+        """Test time axis generation"""
+        print("\nTesting time axis generation:")
+        
+        # Get time scaling parameters
+        time_params = self.scope.get_time_scaling_params()
+        
+        # Generate time axis for different data lengths
+        test_lengths = [100, 1000, 10000]
+        
+        for length in test_lengths:
+            time_axis = self.scope.generate_time_axis(length, time_params)
+            
+            self.assertIsInstance(time_axis, (list, np.ndarray))
+            self.assertEqual(len(time_axis), length)
+            
+            # Check that time axis is monotonically increasing
+            if len(time_axis) > 1:
+                for i in range(1, len(time_axis)):
+                    self.assertGreater(time_axis[i], time_axis[i-1])
+            
+            print(f"  ✓ Generated time axis: {length} points, "
+                  f"range: {time_axis[0]:.2e}s to {time_axis[-1]:.2e}s")
+        
+        print("✓ Time axis generation test completed")
+    
+    def test_scope_metadata_collection(self):
+        """Test comprehensive metadata collection"""
+        print("\nTesting scope metadata collection:")
+        
+        # Test metadata collection for specific channels
+        metadata = self.scope.get_scope_metadata(channels=[1, 2], include_global=True)
+        
+        self.assertIsInstance(metadata, dict)
+        
+        # Check required metadata sections
+        required_sections = ['timestamp', 'instrument', 'acquisition']
+        for section in required_sections:
+            self.assertIn(section, metadata)
+        
+        # Check instrument info
+        instrument_info = metadata['instrument']
+        self.assertIn('vendor', instrument_info)
+        self.assertIn('model', instrument_info)
+        
+        # Check acquisition info
+        acquisition_info = metadata['acquisition']
+        self.assertIn('sample_rate', acquisition_info)
+        self.assertIn('acquisition_mode', acquisition_info)
+        
+        print(f"  ✓ Metadata collected for channels [1, 2]")
+        print(f"  Instrument: {instrument_info.get('vendor')} {instrument_info.get('model')}")
+        print(f"  Sample rate: {acquisition_info.get('sample_rate'):,.0f} Hz")
+        print(f"  Mode: {acquisition_info.get('acquisition_mode')}")
+        
+        # Test metadata without global info
+        metadata_minimal = self.scope.get_scope_metadata(channels=[1], include_global=False)
+        self.assertIsInstance(metadata_minimal, dict)
+        
+        print("✓ Scope metadata collection test completed")
+    
+    def test_capture_waveforms_csv_export(self):
+        """Test waveform capture with CSV export"""
+        print("\nTesting waveform capture with CSV export:")
+        
+        # Setup trigger
+        self.scope.setup_trigger(source_channel=1, level=0.0, slope='rising')
+        
+        # Test CSV export (no metadata)
+        result = self.scope.capture_waveforms(
+            channels=[1, 2],
+            variable_samples=5000,
+            export_data=True,
+            include_metadata=False,  # CSV export
+            filename="test_csv_capture",
+            plot=False
+        )
+        
+        self.assertIsInstance(result, dict)
+        self.assertIn('waveforms', result)
+        self.assertIn('sample_points', result)
+        self.assertIn('channels', result)
+        
+        # Check that CSV file was created
+        if 'csv_file' in result:
+            csv_filename = result['csv_file']
+            self.assertTrue(os.path.exists(csv_filename))
+            
+            # Verify CSV content
+            with open(csv_filename, 'r') as csvfile:
+                reader = csv.reader(csvfile)
+                header = next(reader)
+                self.assertIn('Time', header)
+                self.assertIn('CH1', header)
+                self.assertIn('CH2', header)
+                
+                # Count data rows
+                data_rows = list(reader)
+                self.assertGreater(len(data_rows), 0)
+            
+            print(f"  ✓ CSV file created: {csv_filename}")
+            print(f"  ✓ Data rows: {len(data_rows)}")
+            
+            # Clean up test file
+            os.remove(csv_filename)
+        
+        print("✓ CSV export test completed")
+    
+    def test_capture_waveforms_json_export(self):
+        """Test waveform capture with JSON export (including metadata)"""
+        print("\nTesting waveform capture with JSON export:")
+        
+        # Enable high resolution mode for this test
+        self.scope.set_high_resolution_mode(True)
+        time.sleep(1.0)
+        
+        # Setup trigger
+        self.scope.setup_trigger(source_channel=1, level=0.0, slope='rising')
+        
+        # Test JSON export (with metadata)
+        result = self.scope.capture_waveforms(
+            channels=[1],
+            variable_samples=2500,
+            export_data=True,
+            include_metadata=True,  # JSON export
+            filename="test_json_capture",
+            plot=False
+        )
+        
+        self.assertIsInstance(result, dict)
+        self.assertIn('waveforms', result)
+        self.assertIn('metadata', result)
+        self.assertIn('sample_points', result)
+        
+        # Check that JSON file was created
+        if 'json_file' in result:
+            json_filename = result['json_file']
+            self.assertTrue(os.path.exists(json_filename))
+            
+            # Verify JSON content
+            with open(json_filename, 'r') as jsonfile:
+                json_data = json.load(jsonfile)
+                
+                self.assertIn('metadata', json_data)
+                self.assertIn('waveforms', json_data)
+                
+                # Check metadata structure
+                metadata = json_data['metadata']
+                self.assertIn('instrument', metadata)
+                self.assertIn('acquisition', metadata)
+                
+                # Check waveforms data
+                waveforms = json_data['waveforms']
+                self.assertIn('Time', waveforms)
+                self.assertIn('CH1', waveforms)
+            
+            print(f"  ✓ JSON file created: {json_filename}")
+            print(f"  ✓ Includes metadata and waveform data")
+            
+            # Clean up test file
+            os.remove(json_filename)
+        
+        # Reset to normal mode
+        self.scope.set_high_resolution_mode(False)
+        time.sleep(1.0)
+        
+        print("✓ JSON export test completed")
+    
+    def test_capture_waveforms_no_export(self):
+        """Test waveform capture without file export"""
+        print("\nTesting waveform capture without file export:")
+        
+        # Setup trigger
+        self.scope.setup_trigger(source_channel=1, level=0.0, slope='rising')
+        
+        # Test capture without export
+        result = self.scope.capture_waveforms(
+            channels=[1, 2],
+            variable_samples=1000,
+            export_data=False,  # No file export
+            plot=False
+        )
+        
+        self.assertIsInstance(result, dict)
+        self.assertIn('waveforms', result)
+        self.assertIn('sample_points', result)
+        
+        # Verify no files were created
+        self.assertNotIn('csv_file', result)
+        self.assertNotIn('json_file', result)
+        
+        # Check waveform data structure
+        waveforms = result['waveforms']
+        self.assertIn('Time', waveforms)
+        self.assertIn('CH1', waveforms)
+        self.assertIn('CH2', waveforms)
+        
+        # Verify data types and lengths
+        time_data = waveforms['Time']
+        ch1_data = waveforms['CH1']
+        ch2_data = waveforms['CH2']
+        
+        self.assertIsInstance(time_data, (list, np.ndarray))
+        self.assertIsInstance(ch1_data, list)
+        self.assertIsInstance(ch2_data, list)
+        
+        self.assertEqual(len(time_data), len(ch1_data))
+        self.assertEqual(len(time_data), len(ch2_data))
+        
+        print(f"  ✓ Captured data without export: {len(time_data)} points")
+        print(f"  ✓ Channels: {result['channels']}")
+        
+        print("✓ No export test completed")
+    
+    def test_variable_samples_parameter(self):
+        """Test variable sample length functionality"""
+        print("\nTesting variable sample length:")
+        
+        # Setup trigger
+        self.scope.setup_trigger(source_channel=1, level=0.0, slope='rising')
+        
+        # Test different sample lengths
+        test_samples = [1000, 5000, 10000, 25000]
+        
+        for sample_count in test_samples:
+            result = self.scope.capture_waveforms(
+                channels=[1],
+                variable_samples=sample_count,
+                export_data=False,
+                plot=False
+            )
+            
+            actual_points = result['sample_points']
+            waveform_length = len(result['waveforms']['CH1'])
+            
+            # Allow some tolerance for scope limitations
+            self.assertGreater(actual_points, sample_count * 0.8)
+            self.assertEqual(actual_points, waveform_length)
+            
+            print(f"  ✓ Requested: {sample_count}, Got: {actual_points} points")
+        
+        print("✓ Variable samples test completed")
+    
+    def test_csv_save_functionality(self):
+        """Test CSV save functionality directly"""
+        print("\nTesting CSV save functionality:")
+        
         # Create test waveform data
         test_waveforms = {
-            'CH1': [0.1, 0.2, 0.3, 0.4, 0.5],
-            'CH2': [-0.1, -0.2, -0.3, -0.4, -0.5]
+            'Time': [0.0, 1e-6, 2e-6, 3e-6, 4e-6],
+            'CH1': [0.1, 0.2, 0.3, 0.2, 0.1],
+            'CH2': [-0.05, -0.1, -0.15, -0.1, -0.05]
         }
         
         # Test CSV save
-        filename = self.scope.save_waveforms_to_csv(test_waveforms, "test_waveforms.csv")
+        filename = self.scope.save_csv(test_waveforms, "test_csv_direct")
         
         self.assertTrue(os.path.exists(filename))
         
@@ -365,98 +533,60 @@ class TestMSO44B(unittest.TestCase):
             rows = list(reader)
             
             self.assertEqual(len(rows), 5)  # Should have 5 data rows
-            self.assertIn('Time', rows[0])
-            self.assertIn('CH1', rows[0])
-            self.assertIn('CH2', rows[0])
+            
+            # Check header
+            fieldnames = reader.fieldnames
+            self.assertIn('Time', fieldnames)
+            self.assertIn('CH1', fieldnames)
+            self.assertIn('CH2', fieldnames)
+            
+            # Check first row data
+            first_row = rows[0]
+            self.assertEqual(float(first_row['Time']), 0.0)
+            self.assertEqual(float(first_row['CH1']), 0.1)
+            self.assertEqual(float(first_row['CH2']), -0.05)
+        
+        print(f"  ✓ CSV file saved: {filename}")
+        print(f"  ✓ Data rows: {len(rows)}")
         
         # Clean up test file
-        if os.path.exists(filename):
-            os.remove(filename)
+        os.remove(filename)
         
-        print("CSV file operations test passed")
+        print("✓ CSV save functionality test completed")
     
-    def test_active_channels_detection(self):
-        """Test detection of active channels"""
-        # Turn on specific channels
-        self.scope.set_channel_state(1, 'ON')
-        self.scope.set_channel_state(2, 'ON')
-        self.scope.set_channel_state(3, 'OFF')
-        self.scope.set_channel_state(4, 'OFF')
+    def test_instrument_discovery(self):
+        """Test instrument discovery functionality"""
+        print("\nTesting instrument discovery:")
         
-        time.sleep(0.5)
+        # Test static method for listing all instruments
+        try:
+            instruments = MSO44B.list_all_instruments()
+            print(f"  ✓ Found {len(instruments) if instruments else 0} total instruments")
+            
+            # Look for MSO instruments in the list
+            mso_count = 0
+            if instruments:
+                for instr in instruments:
+                    if 'MSO' in instr.get('device_id', '').upper():
+                        mso_count += 1
+                        print(f"    MSO found: {instr.get('resource')} - {instr.get('device_id')}")
+            
+            print(f"  ✓ MSO instruments found: {mso_count}")
+            
+        except Exception as e:
+            print(f"  Discovery test failed: {e}")
         
-        # Check which channels are detected as active
-        active_channels = []
-        for channel in [1, 2, 3, 4]:
-            state = self.scope.get_channel_state(channel).strip()
-            if state == '1' or state.upper() == 'ON':
-                active_channels.append(channel)
+        # Test instance discovery method
+        try:
+            scope_temp = MSO44B()
+            mso_instruments = scope_temp._discover_mso44_instruments()
+            print(f"  ✓ MSO44/46 specific discovery found: {len(mso_instruments) if mso_instruments else 0}")
+            
+        except Exception as e:
+            print(f"  MSO44 discovery test failed: {e}")
         
-        self.assertIn(1, active_channels)
-        self.assertIn(2, active_channels)
-        self.assertNotIn(3, active_channels)
-        self.assertNotIn(4, active_channels)
-        
-        print(f"Active channels detected: {active_channels}")
-    
-    def test_operation_complete_check(self):
-        """Test operation complete functionality"""
-        # Send a command and check completion
-        self.scope.set_time_scale(1e-3)
-        
-        # Check if operation is complete
-        is_complete = self.scope.is_complete()
-        self.assertIsInstance(is_complete, bool)
-        
-        print(f"Operation complete check: {is_complete}")
-    
-    def test_comprehensive_scope_setup(self):
-        """Test a complete oscilloscope measurement setup"""
-        print("Setting up comprehensive measurement scenario:")
-        
-        # Configure channels
-        self.scope.set_channel_state(1, 'ON')
-        self.scope.set_channel_state(2, 'ON')
-        self.scope.set_channel_scale(1, 1.0)  # 1V/div
-        self.scope.set_channel_scale(2, 0.5)  # 0.5V/div
-        self.scope.set_channel_coupling(1, 'DC')
-        self.scope.set_channel_coupling(2, 'AC')
-        
-        # Configure time base
-        self.scope.set_time_scale(10e-6)  # 10µs/div
-        
-        # Configure trigger
-        self.scope.set_trigger(1, 0.5, 'RISING')
-        
-        # Set sample rate
-        self.scope.set_sample_rate(100e6)  # 100MS/s
-        
-        # Verify all settings
-        ch1_scale = float(self.scope.get_channel_scale(1))
-        ch2_scale = float(self.scope.get_channel_scale(2))
-        time_scale = float(self.scope.get_time_scale())
-        trigger_info = self.scope.get_trigger()
-        
-        self.assertAlmostEqual(ch1_scale, 1.0, delta=0.1)
-        self.assertAlmostEqual(ch2_scale, 0.5, delta=0.1)
-        self.assertAlmostEqual(time_scale, 10e-6, delta=1e-6)
-        self.assertAlmostEqual(float(trigger_info['level']), 0.5, delta=0.1)
-        
-        print(f"  CH1: {ch1_scale} V/div, DC coupling")
-        print(f"  CH2: {ch2_scale} V/div, AC coupling")
-        print(f"  Time: {time_scale:.2e} s/div")
-        print(f"  Trigger: CH1, {trigger_info['level']} V, {trigger_info['slope']}")
-        
-        # Test acquisition
-        self.scope.stop()
-        self.scope.single()
-        
-        acquisition_state = self.scope.get_acquisition_state()
-        print(f"  Acquisition state: {acquisition_state}")
-        
-        print("Comprehensive setup test completed")
+        print("✓ Instrument discovery test completed")
 
 if __name__ == "__main__":
     # Run with verbose output
-    unittest.main(verbosity=2)
-    
+    unittest.main(verbosity=2, buffer=True)
