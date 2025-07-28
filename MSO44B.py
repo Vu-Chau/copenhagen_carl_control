@@ -369,6 +369,11 @@ class MSO44B:
                 print(f"Set record length to {variable_samples} samples (actual: {actual_length})")
                 if actual_length != variable_samples:
                     print(f"Warning: Scope set record length to {actual_length} instead of {variable_samples}")
+                
+                # Set data transfer range to capture all samples
+                self.scope.acq.wfm_start = 1
+                self.scope.acq.wfm_stop = actual_length
+                print(f"Set data transfer range: 1 to {actual_length}")
             except Exception as e:
                 print(f"Warning: Could not set record length: {e}")
             
