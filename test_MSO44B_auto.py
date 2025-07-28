@@ -141,6 +141,9 @@ class TestMSO44B(unittest.TestCase):
             hires_mode = self.scope.get_acquisition_mode()
             hires_sample_rate = float(self.scope.query('ACQuire:SRATe?'))
             
+            # Get waveform format information
+            format_info = self.scope.get_waveform_format_info()
+            
             # Try to get bandwidth if available
             try:
                 hires_bandwidth = self.scope.query('ACQuire:BANdwidth?')
@@ -150,10 +153,21 @@ class TestMSO44B(unittest.TestCase):
             print(f"  High-res mode - Mode: {hires_mode}")
             print(f"  High-res mode - Sample Rate: {hires_sample_rate:,.0f} S/s")
             print(f"  High-res mode - Bandwidth: {hires_bandwidth}")
+            print(f"  High-res mode - Data Format: {format_info}")
             
             # Verify it's in high resolution mode (16-bit)
             self.assertIn('HIRES', hires_mode.upper(), 
                           f"Expected HIRES mode, got: {hires_mode}")
+            
+            # Verify 16-bit data format is enabled
+            if 'error' not in format_info:
+                self.assertEqual(format_info.get('bit_resolution'), 16,
+                                f"Expected 16-bit resolution, got: {format_info.get('bit_resolution')}")
+                self.assertEqual(format_info.get('encoding').lower(), 'binary',
+                                f"Expected binary encoding for 16-bit, got: {format_info.get('encoding')}")
+                print("  ✓ 16-bit binary data format confirmed")
+            else:
+                print(f"  ⚠ Could not verify data format: {format_info['error']}")
             
             # Compare sample rates if both were obtained
             if normal_sample_rate and hires_sample_rate:
@@ -173,13 +187,23 @@ class TestMSO44B(unittest.TestCase):
             # Check acquisition mode again
             current_mode = self.scope.get_acquisition_mode()
             restored_sample_rate = float(self.scope.query('ACQuire:SRATe?'))
+            restored_format_info = self.scope.get_waveform_format_info()
             
             print(f"  Restored mode - Mode: {current_mode}")
             print(f"  Restored mode - Sample Rate: {restored_sample_rate:,.0f} S/s")
+            print(f"  Restored mode - Data Format: {restored_format_info}")
             
             # Verify it's back to normal sampling mode (8-bit)
             self.assertIn('SAMPLE', current_mode.upper(), 
                           f"Expected SAMPLE mode, got: {current_mode}")
+            
+            # Verify data format is back to ASCII
+            if 'error' not in restored_format_info:
+                self.assertEqual(restored_format_info.get('encoding').lower(), 'ascii',
+                                f"Expected ASCII encoding for normal mode, got: {restored_format_info.get('encoding')}")
+                print("  ✓ ASCII data format restored")
+            else:
+                print(f"  ⚠ Could not verify restored data format: {restored_format_info['error']}")
                           
         except Exception as e:
             print(f"  ⚠ Could not verify restored mode: {e}")

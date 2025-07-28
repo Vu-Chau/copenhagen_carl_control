@@ -369,8 +369,8 @@ class MSO44B:
             self.scope.acq.stop_after = 'sequence'
             self.scope.acq.num_seq = 1
             
-            # Configure waveform data format - use ASCII for reliability
-            self.scope.acq.wfm_encoding = 'ascii'
+            # Use current waveform encoding (ASCII or binary depending on resolution mode)
+            # Don't override encoding here - let set_high_resolution_mode() control it
             
             # Collect metadata before acquisition (if requested)
             metadata = None
@@ -394,8 +394,10 @@ class MSO44B:
                     print(f"Warning: Invalid channel {ch}. Skipping.")
                     continue
                 
-                # Use the reusable waveform reading method
-                waveform_result = self.read_channel_waveform(ch)
+                # Use the reusable waveform reading method with auto-format detection
+                current_encoding = self.scope.acq.wfm_encoding
+                use_binary = (current_encoding.lower() == 'binary')
+                waveform_result = self.read_channel_waveform(ch, use_binary=use_binary)
                 voltage_data = waveform_result['voltage_data']
                 
                 # Generate time data once (same for all channels)
@@ -621,10 +623,23 @@ class MSO44B:
         
         try:
             if enable:
+                # Enable HIRES acquisition mode for 16-bit resolution
                 self.scope.acq.mode = 'hires'
-                print("High resolution (16-bit) mode enabled")
+                
+                # Configure waveform format for 16-bit data transfer
+                self.scope.acq.wfm_encoding = 'binary'
+                self.scope.acq.wfm_binary_format = 'ri'  # Signed integer
+                self.scope.acq.wfm_byte_nr = 2  # 2 bytes per sample for 16-bit
+                self.scope.acq.wfm_byte_order = 'lsb'
+                
+                print("High resolution (16-bit) mode enabled with binary data format")
             else:
+                # Return to normal sampling mode
                 self.scope.acq.mode = 'sample'
+                
+                # Reset to ASCII format for compatibility
+                self.scope.acq.wfm_encoding = 'ascii'
+                
                 print("Normal sampling mode enabled")
             return True
         except Exception as e:
@@ -641,6 +656,46 @@ class MSO44B:
         if not self.connected:
             raise RuntimeError("Not connected to scope")
         return self.scope.acq.mode
+    
+    def get_waveform_format_info(self):
+        """
+        Get current waveform data format settings.
+        
+        Returns:
+            dict: Dictionary with encoding, format, byte count, and bit resolution info
+        """
+        if not self.connected:
+            raise RuntimeError("Not connected to scope")
+        
+        try:
+            encoding = self.scope.acq.wfm_encoding
+            bit_resolution = 8  # Default for ASCII
+            
+            if encoding.lower() == 'binary':
+                byte_nr = self.scope.acq.wfm_byte_nr
+                binary_format = self.scope.acq.wfm_binary_format
+                byte_order = self.scope.acq.wfm_byte_order
+                bit_resolution = byte_nr * 8
+                
+                return {
+                    'encoding': encoding,
+                    'binary_format': binary_format,
+                    'bytes_per_sample': byte_nr,
+                    'byte_order': byte_order,
+                    'bit_resolution': bit_resolution,
+                    'is_signed': binary_format == 'ri'
+                }
+            else:
+                return {
+                    'encoding': encoding,
+                    'bit_resolution': bit_resolution,
+                    'binary_format': 'N/A',
+                    'bytes_per_sample': 'N/A',
+                    'byte_order': 'N/A',
+                    'is_signed': 'N/A'
+                }
+        except Exception as e:
+            return {'error': str(e)}
     
     def get_scope_metadata(self, channels=None, include_global=True):
         """
