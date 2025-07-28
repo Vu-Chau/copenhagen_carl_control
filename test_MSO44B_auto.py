@@ -221,6 +221,75 @@ class TestMSO44B(unittest.TestCase):
         
         print("✓ High resolution mode test completed")
     
+    def test_bandwidth_control(self):
+        """Test channel bandwidth limit control"""
+        print("\nTesting bandwidth control:")
+        
+        # Test getting current bandwidth for all channels
+        original_bandwidths = {}
+        for ch in range(1, 5):
+            try:
+                bw = self.scope.get_channel_bandwidth(ch)
+                original_bandwidths[ch] = bw
+                print(f"  CH{ch} original bandwidth: {bw}")
+            except Exception as e:
+                print(f"  ⚠ Could not get CH{ch} bandwidth: {e}")
+        
+        # Test setting bandwidth limits
+        test_bandwidths = [
+            ('FULL', 'FULL'),
+            (20e6, '20 MHz'),
+            (200e6, '200 MHz'),
+            ('FULL', 'FULL')  # Reset to full
+        ]
+        
+        for bw_value, description in test_bandwidths:
+            print(f"\n  Testing bandwidth limit: {description}")
+            
+            # Set bandwidth for channel 1
+            try:
+                success = self.scope.set_channel_bandwidth(1, bw_value)
+                if success:
+                    # Verify the setting
+                    current_bw = self.scope.get_channel_bandwidth(1)
+                    print(f"    ✓ CH1 bandwidth set to: {current_bw}")
+                else:
+                    print(f"    ⚠ Failed to set CH1 bandwidth to {description}")
+            except Exception as e:
+                print(f"    ⚠ Error setting CH1 bandwidth: {e}")
+        
+        # Test setting all channels at once
+        try:
+            print(f"\n  Setting all channels to 200 MHz...")
+            results = self.scope.set_all_channels_bandwidth(200e6)
+            success_count = sum(1 for success in results.values() if success)
+            print(f"    ✓ Successfully set {success_count}/4 channels")
+            
+            # Verify all channels
+            for ch in range(1, 5):
+                try:
+                    bw = self.scope.get_channel_bandwidth(ch)
+                    print(f"    CH{ch}: {bw}")
+                except Exception as e:
+                    print(f"    CH{ch}: Error - {e}")
+                    
+        except Exception as e:
+            print(f"    ⚠ Error setting all channels: {e}")
+        
+        # Restore original bandwidth settings
+        try:
+            print(f"\n  Restoring original bandwidth settings...")
+            for ch, original_bw in original_bandwidths.items():
+                try:
+                    self.scope.set_channel_bandwidth(ch, original_bw)
+                    print(f"    ✓ CH{ch} restored to: {original_bw}")
+                except Exception as e:
+                    print(f"    ⚠ Could not restore CH{ch}: {e}")
+        except Exception as e:
+            print(f"    ⚠ Error during restoration: {e}")
+        
+        print("✓ Bandwidth control test completed")
+    
     def test_trigger_setup(self):
         """Test trigger configuration"""
         print("\nTesting trigger setup:")

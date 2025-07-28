@@ -697,6 +697,79 @@ class MSO44B:
         except Exception as e:
             return {'error': str(e)}
     
+    def set_channel_bandwidth(self, channel, bandwidth_limit):
+        """
+        Set bandwidth limit for a specific channel.
+        
+        Args:
+            channel (int): Channel number (1-4)
+            bandwidth_limit (str or float): Bandwidth limit in Hz, or 'FULL' for no limit
+                                          Common values: 'FULL', 20e6, 200e6, etc.
+        
+        Returns:
+            bool: True if successful
+        """
+        if not self.connected:
+            print("Error: Not connected to scope. Call connect() first.")
+            return False
+        
+        if channel < 1 or channel > self.scope.ch_a_num:
+            print(f"Error: Invalid channel {channel}. Must be 1-{self.scope.ch_a_num}")
+            return False
+        
+        try:
+            if isinstance(bandwidth_limit, str) and bandwidth_limit.upper() == 'FULL':
+                self.scope.sc.write(f'CH{channel}:BANdwidth FULL')
+                print(f"CH{channel} bandwidth limit set to FULL (no limit)")
+            else:
+                # Convert to float if it's a number
+                bw_value = float(bandwidth_limit)
+                self.scope.sc.write(f'CH{channel}:BANdwidth {bw_value}')
+                print(f"CH{channel} bandwidth limit set to {bw_value:,.0f} Hz")
+            
+            return True
+            
+        except Exception as e:
+            print(f"Failed to set bandwidth for CH{channel}: {e}")
+            return False
+    
+    def get_channel_bandwidth(self, channel):
+        """
+        Get current bandwidth limit for a specific channel.
+        
+        Args:
+            channel (int): Channel number (1-4)
+        
+        Returns:
+            str: Current bandwidth limit setting
+        """
+        if not self.connected:
+            raise RuntimeError("Not connected to scope")
+        
+        if channel < 1 or channel > self.scope.ch_a_num:
+            raise ValueError(f"Invalid channel {channel}. Must be 1-{self.scope.ch_a_num}")
+        
+        try:
+            bandwidth = self.scope.sc.query(f'CH{channel}:BANdwidth?').strip()
+            return bandwidth
+        except Exception as e:
+            raise RuntimeError(f"Failed to get bandwidth for CH{channel}: {e}")
+    
+    def set_all_channels_bandwidth(self, bandwidth_limit):
+        """
+        Set bandwidth limit for all channels.
+        
+        Args:
+            bandwidth_limit (str or float): Bandwidth limit in Hz, or 'FULL' for no limit
+        
+        Returns:
+            dict: Dictionary with channel results
+        """
+        results = {}
+        for ch in range(1, self.scope.ch_a_num + 1):
+            results[f'CH{ch}'] = self.set_channel_bandwidth(ch, bandwidth_limit)
+        return results
+    
     def get_scope_metadata(self, channels=None, include_global=True):
         """
         Collect comprehensive scope metadata for export with waveform data.
