@@ -410,6 +410,7 @@ class MSO44B:
             # Capture waveform data using reusable methods
             waveform_data = {}
             time_data = None
+            actual_samples_captured = 0
             
             for ch in channels:
                 if ch < 1 or ch > self.scope.ch_a_num:
@@ -422,6 +423,9 @@ class MSO44B:
                 waveform_result = self.read_channel_waveform(ch, use_binary=use_binary)
                 voltage_data = waveform_result['voltage_data']
                 
+                # Track actual samples captured
+                actual_samples_captured = len(voltage_data)
+                
                 # Generate time data once (same for all channels)
                 if time_data is None:
                     time_params = self.get_time_scaling_params()
@@ -429,6 +433,22 @@ class MSO44B:
                 
                 waveform_data[f'CH{ch}'] = voltage_data
                 print(f"Captured {len(voltage_data)} points from CH{ch}")
+            
+            # Verify actual transfer length vs requested
+            if actual_samples_captured > 0:
+                actual_record_length = self.scope.acq.horiz_record_length
+                transfer_efficiency = (actual_samples_captured / actual_record_length) * 100
+                
+                print(f"Data transfer verification:")
+                print(f"  Requested samples: {variable_samples}")
+                print(f"  Actual record length: {actual_record_length}") 
+                print(f"  Samples transferred: {actual_samples_captured}")
+                print(f"  Transfer efficiency: {transfer_efficiency:.1f}%")
+                
+                if actual_samples_captured != actual_record_length:
+                    print(f"⚠ Warning: Transfer mismatch! Expected {actual_record_length}, got {actual_samples_captured}")
+                else:
+                    print(f"✓ Transfer complete: All {actual_samples_captured} samples captured")
             
             # Convert time data to list for JSON compatibility if metadata included
             if include_metadata:
