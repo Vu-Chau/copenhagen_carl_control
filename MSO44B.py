@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import csv
 import os
+import json
 from datetime import datetime
 from pyMSO4 import MSO4
 from pyMSO4.triggers import MSO4EdgeTrigger
@@ -326,25 +327,34 @@ class MSO44B:
             'format_used': 'binary' if use_binary else 'ascii'
         }
     
-    def capture_waveforms(self, channels=[1], filename=None, plot=True, save_csv=True):
+    def capture_waveforms(self, channels=[1], filename=None, plot=True, export_data=True, 
+                         include_metadata=False, variable_samples=10000):
         """
         Capture waveforms from specified channels with trigger.
         
         Args:
             channels (list): List of channel numbers to capture (e.g., [1, 2, 3, 4])
-            filename (str, optional): Base filename for saved files. 
-                                    If None, uses timestamp.
+            filename (str, optional): Base filename for saved files. If None, uses timestamp.
             plot (bool): Whether to create and save plots
-            save_csv (bool): Whether to save data as CSV
+            export_data (bool): Whether to export captured data to file
+            include_metadata (bool): Whether to include scope metadata (exports as JSON if True, CSV if False)
+            variable_samples (int): Number of samples to capture (record length, default: 10000)
         
         Returns:
-            dict: Dictionary containing waveform data and metadata
+            dict: Dictionary containing waveform data and metadata (if requested)
         """
         if not self.connected:
             print("Error: Not connected to scope. Call connect() first.")
             return None
             
         try:
+            # Set record length for variable samples
+            try:
+                self.scope.acq.horiz_record_length = variable_samples
+                print(f"Set record length to {variable_samples} samples")
+            except Exception as e:
+                print(f"Warning: Could not set record length: {e}")
+            
             # Enable requested channels
             for i in range(1, self.scope.ch_a_num + 1):
                 if i < len(self.scope.ch_a):
@@ -361,6 +371,11 @@ class MSO44B:
             
             # Configure waveform data format - use ASCII for reliability
             self.scope.acq.wfm_encoding = 'ascii'
+            
+            # Collect metadata before acquisition (if requested)
+            metadata = None
+            if include_metadata:
+                metadata = self.get_scope_metadata(channels=channels, include_global=True)
             
             # Start single acquisition and wait for trigger
             print("Waiting for trigger...")
@@ -391,7 +406,11 @@ class MSO44B:
                 waveform_data[f'CH{ch}'] = voltage_data
                 print(f"Captured {len(voltage_data)} points from CH{ch}")
             
-            waveform_data['Time'] = time_data
+            # Convert time data to list for JSON compatibility if metadata included
+            if include_metadata:
+                waveform_data['Time'] = time_data.tolist()
+            else:
+                waveform_data['Time'] = time_data
             
             # Generate filename if not provided
             if filename is None:
@@ -405,17 +424,38 @@ class MSO44B:
                 'sample_points': len(time_data) if time_data is not None else 0
             }
             
-            # Save CSV if requested
-            if save_csv:
-                csv_filename = self.save_csv(waveform_data, f"{filename}.csv")
-                results['csv_file'] = csv_filename
+            # Add metadata to results if requested
+            if include_metadata:
+                results['metadata'] = metadata
+            
+            # Export data if requested
+            if export_data:
+                if include_metadata:
+                    # Export as JSON with metadata
+                    json_data = {
+                        'metadata': metadata,
+                        'waveforms': waveform_data
+                    }
+                    json_filename = f"{filename}.json"
+                    
+                    try:
+                        with open(json_filename, 'w') as f:
+                            json.dump(json_data, f, indent=2, default=str)
+                        print(f"Data and metadata saved to {json_filename}")
+                        results['json_file'] = json_filename
+                    except Exception as e:
+                        print(f"JSON save failed: {e}")
+                else:
+                    # Export as CSV without metadata
+                    csv_filename = self.save_csv(waveform_data, f"{filename}.csv")
+                    results['csv_file'] = csv_filename
             
             # Create plot if requested
             if plot:
                 plot_filename = self.plot_waveforms(waveform_data, channels, f"{filename}.png")
                 results['plot_file'] = plot_filename
             
-            print(f"Capture complete! Saved as {filename}")
+            print(f"Capture complete! Base filename: {filename}")
             return results
             
         except Exception as e:
@@ -522,6 +562,254 @@ class MSO44B:
         """Context manager exit - automatically disconnect."""
         self.disconnect()
     
+    def write(self, command):
+        """
+        Send a SCPI command to the scope.
+        
+        Args:
+            command (str): SCPI command string
+            
+        Returns:
+            Result of the write operation
+        """
+        if not self.connected:
+            raise RuntimeError("Not connected to scope. Call connect() first.")
+        return self.scope.sc.write(command)
+    
+    def query(self, command):
+        """
+        Send a SCPI query to the scope and return the response.
+        
+        Args:
+            command (str): SCPI query string
+            
+        Returns:
+            str: Response from the scope
+        """
+        if not self.connected:
+            raise RuntimeError("Not connected to scope. Call connect() first.")
+        return self.scope.sc.query(command).strip()
+    
+    def device_id(self):
+        """
+        Get the instrument identification string.
+        
+        Returns:
+            str: Device identification (``*IDN?`` response)
+        """
+        return self.query('*IDN?')
+    
+    def close(self):
+        """
+        Close the connection to the scope (alias for disconnect).
+        """
+        self.disconnect()
+    
+    def set_high_resolution_mode(self, enable=True):
+        """
+        Enable/disable high resolution (16-bit) acquisition mode.
+        
+        Args:
+            enable (bool): True to enable Hi-Res mode, False for normal sample mode
+            
+        Returns:
+            bool: True if successful
+        """
+        if not self.connected:
+            print("Error: Not connected to scope. Call connect() first.")
+            return False
+        
+        try:
+            if enable:
+                self.scope.acq.mode = 'hires'
+                print("High resolution (16-bit) mode enabled")
+            else:
+                self.scope.acq.mode = 'sample'
+                print("Normal sampling mode enabled")
+            return True
+        except Exception as e:
+            print(f"Failed to set acquisition mode: {e}")
+            return False
+
+    def get_acquisition_mode(self):
+        """
+        Get current acquisition mode.
+        
+        Returns:
+            str: Current acquisition mode ('sample', 'hires', 'average', etc.)
+        """
+        if not self.connected:
+            raise RuntimeError("Not connected to scope")
+        return self.scope.acq.mode
+    
+    def get_scope_metadata(self, channels=None, include_global=True):
+        """
+        Collect comprehensive scope metadata for export with waveform data.
+        
+        Args:
+            channels (list, optional): List of channel numbers to include metadata for.
+                                     If None, includes all enabled channels.
+            include_global (bool): Whether to include global instrument metadata.
+        
+        Returns:
+            dict: Structured metadata dictionary ready for JSON export
+        """
+        if not self.connected:
+            raise RuntimeError("Not connected to scope. Call connect() first.")
+        
+        metadata = {
+            "timestamp": datetime.now().isoformat(),
+            "metadata_version": "1.0"
+        }
+        
+        # Global instrument metadata
+        if include_global:
+            try:
+                instrument_info = self.scope._id_scope()
+                metadata["instrument"] = {
+                    "vendor": instrument_info.get("vendor", "Unknown"),
+                    "model": instrument_info.get("model", "Unknown"), 
+                    "serial_number": instrument_info.get("serial", "Unknown"),
+                    "firmware_version": instrument_info.get("firmware", "Unknown"),
+                    "connection_ip": getattr(self, 'ip_address', 'Unknown')
+                }
+                
+                # Acquisition settings
+                metadata["acquisition"] = {
+                    "sample_rate": self.scope.acq.horiz_sample_rate,
+                    "record_length": self.scope.acq.horiz_record_length,
+                    "timebase_scale": self.scope.acq.horiz_scale,
+                    "timebase_position": self.scope.acq.horiz_pos,
+                    "acquisition_mode": self.scope.acq.mode,
+                    "stop_after": self.scope.acq.stop_after,
+                    "num_sequences": self.scope.acq.num_seq,
+                    "fast_acquisition": self.scope.acq.fast_acq,
+                    "horizontal_mode": self.scope.acq.horiz_mode
+                }
+                
+                # Waveform transfer settings
+                metadata["waveform_settings"] = {
+                    "encoding": self.scope.acq.wfm_encoding,
+                    "binary_format": getattr(self.scope.acq, 'wfm_binary_format', 'N/A'),
+                    "byte_order": getattr(self.scope.acq, 'wfm_byte_order', 'N/A'),
+                    "bytes_per_point": getattr(self.scope.acq, 'wfm_byte_nr', 'N/A'),
+                    "data_start": self.scope.acq.wfm_start,
+                    "data_stop": self.scope.acq.wfm_stop
+                }
+                
+                # Trigger settings
+                metadata["trigger"] = {
+                    "source": self.scope.trigger.source,
+                    "level": self.scope.trigger.level,
+                    "mode": self.scope.trigger.mode,
+                    "coupling": self.scope.trigger.coupling
+                }
+                
+                # Add trigger-specific settings based on type
+                if hasattr(self.scope.trigger, 'edge_slope'):
+                    metadata["trigger"]["edge_slope"] = self.scope.trigger.edge_slope
+                    metadata["trigger"]["type"] = "edge"
+                
+                if hasattr(self.scope.trigger, 'polarity'):
+                    metadata["trigger"]["polarity"] = self.scope.trigger.polarity
+                    metadata["trigger"]["type"] = "width"
+                    if hasattr(self.scope.trigger, 'lowlimit'):
+                        metadata["trigger"]["width_low_limit"] = self.scope.trigger.lowlimit
+                    if hasattr(self.scope.trigger, 'highlimit'):
+                        metadata["trigger"]["width_high_limit"] = self.scope.trigger.highlimit
+                    if hasattr(self.scope.trigger, 'when'):
+                        metadata["trigger"]["width_condition"] = self.scope.trigger.when
+                        
+            except Exception as e:
+                print(f"Warning: Could not collect global metadata: {e}")
+                metadata["global_metadata_error"] = str(e)
+        
+        # Channel-specific metadata
+        metadata["channels"] = {}
+        
+        # Determine which channels to include
+        if channels is None:
+            # Include all enabled channels
+            channels_to_process = []
+            for i in range(1, self.scope.ch_a_num + 1):
+                try:
+                    if self.scope.ch_a[i].enable:
+                        channels_to_process.append(i)
+                except:
+                    continue
+        else:
+            channels_to_process = channels
+        
+        # Collect channel metadata
+        for ch in channels_to_process:
+            if ch < 1 or ch > self.scope.ch_a_num:
+                print(f"Warning: Invalid channel {ch}. Skipping.")
+                continue
+                
+            try:
+                ch_metadata = {
+                    "enabled": self.scope.ch_a[ch].enable,
+                    "vertical_scale": self.scope.ch_a[ch].scale,  # V/div
+                    "vertical_position": self.scope.ch_a[ch].position,  # V
+                }
+                
+                # Get additional channel settings if available
+                try:
+                    # Try to get coupling (may not be available in all pyMSO4 versions)
+                    coupling = self.scope.sc.query(f'CH{ch}:COUPling?').strip()
+                    ch_metadata["coupling"] = coupling
+                except:
+                    ch_metadata["coupling"] = "Unknown"
+                
+                try:
+                    # Try to get termination
+                    termination = self.scope.sc.query(f'CH{ch}:TERmination?').strip()
+                    ch_metadata["termination"] = termination
+                except:
+                    ch_metadata["termination"] = "Unknown"
+                
+                try:
+                    # Try to get bandwidth limit
+                    bandwidth = self.scope.sc.query(f'CH{ch}:BANdwidth?').strip()
+                    ch_metadata["bandwidth_limit"] = bandwidth
+                except:
+                    ch_metadata["bandwidth_limit"] = "Unknown"
+                
+                # Get waveform scaling parameters for this channel
+                try:
+                    scaling_params = self.get_waveform_scaling_params(ch)
+                    ch_metadata["scaling"] = {
+                        "y_multiplier": scaling_params["y_mult"],
+                        "y_zero": scaling_params["y_zero"], 
+                        "y_offset": scaling_params["y_off"],
+                        "channel_scale": scaling_params["channel_scale"],
+                        "channel_position": scaling_params["channel_position"]
+                    }
+                except Exception as e:
+                    ch_metadata["scaling_error"] = str(e)
+                
+                metadata["channels"][f"CH{ch}"] = ch_metadata
+                
+            except Exception as e:
+                print(f"Warning: Could not collect metadata for CH{ch}: {e}")
+                metadata["channels"][f"CH{ch}"] = {"error": str(e)}
+        
+        # Add time scaling parameters (same for all channels)
+        try:
+            time_params = self.get_time_scaling_params()
+            metadata["time_scaling"] = {
+                "x_increment": time_params["x_incr"],
+                "x_zero": time_params["x_zero"],
+                "point_offset": time_params["pt_off"],
+                "sample_rate": time_params["sample_rate"],
+                "horizontal_scale": time_params["horiz_scale"]
+            }
+        except Exception as e:
+            print(f"Warning: Could not collect time scaling metadata: {e}")
+            metadata["time_scaling_error"] = str(e)
+        
+        return metadata
+    
     @staticmethod
     def list_all_instruments():
         """
@@ -575,40 +863,4 @@ class MSO44B:
         
         return instruments
 
-
-# Legacy compatibility - keep the original minimal class
-class MSO44BLegacy:
-    """Legacy MSO44B class for backward compatibility."""
-    
-    def __init__(self, resource_name=None, ip_address=None, serial_port=None):
-        if not any([resource_name, ip_address, serial_port]):
-            raise ValueError("Must provide either resource_name, ip_address, or serial_port")
-        
-        self.rm = pyvisa.ResourceManager()
-        
-        if resource_name:
-            self.resource_name = resource_name
-        elif ip_address:
-            self.resource_name = f'TCPIP::{ip_address}::INSTR'
-        elif serial_port:
-            self.resource_name = f'ASRL{serial_port}::INSTR'
-        
-        self.scope = self.rm.open_resource(self.resource_name)
-        
-        if serial_port:
-            self.scope.baud_rate = 115200
-            self.scope.data_bits = 8
-    
-    def write(self, command):
-        return self.scope.write(command)
-    
-    def query(self, command):
-        return self.scope.query(command)
-    
-    def device_id(self):
-        return self.query('*IDN?')
-    
-    def close(self):
-        self.scope.close()
-        self.rm.close()
 

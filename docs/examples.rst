@@ -28,36 +28,47 @@ Generate a 1 kHz square wave:
 Basic Signal Capture
 --------------------
 
-Capture waveforms from multiple channels:
+Capture waveforms with JSON metadata export:
 
 .. code-block:: python
 
    from MSO44B import MSO44B
 
-   with MSO44B() as scope:
-       # Auto-connect to oscilloscope
-       if not scope.connect():
-           print("No oscilloscope found")
-           return
+   scope = MSO44B()
+   if not scope.connect():
+       print("No oscilloscope found")
+       return
+   
+   # Enable high resolution mode
+   scope.set_high_resolution_mode(True)
+   print(f"Acquisition mode: {scope.get_acquisition_mode()}")
+   
+   # Setup trigger
+   scope.setup_trigger(
+       source_channel=1,
+       level=0.5,           # 0.5V trigger level
+       slope='rising'
+   )
+   
+   # Capture with metadata (JSON export)
+   result = scope.capture_waveforms(
+       channels=[1, 2, 3],
+       variable_samples=25000,   # Custom sample count
+       export_data=True,
+       include_metadata=True,    # JSON with complete metadata
+       filename="my_measurement"
+   )
+   
+   if result:
+       print(f"Captured {result['sample_points']} points")
+       print(f"JSON file: {result.get('json_file', 'N/A')}")
        
-       # Setup trigger
-       scope.setup_trigger(
-           source_channel=1,
-           level=0.5,           # 0.5V trigger level
-           slope='rising'
-       )
-       
-       # Capture from channels 1, 2, and 3
-       results = scope.capture_waveforms(
-           channels=[1, 2, 3],
-           filename="my_measurement",
-           plot=True,           # Create plot
-           save_csv=True        # Save CSV file
-       )
-       
-       if results:
-           print(f"Captured {results['sample_points']} points")
-           print(f"Files: {results['csv_file']}, {results['plot_file']}")
+       # Display metadata summary
+       if 'metadata' in result:
+           metadata = result['metadata']
+           print(f"Sample rate: {metadata['acquisition']['sample_rate']:,.0f} Hz")
+   
+   scope.close()
 
 Complete Test Setup
 -------------------
@@ -68,10 +79,14 @@ Generate a signal and capture it:
 
    from AFG31000 import AFG31000
    from MSO44B import MSO44B
+   import numpy as np
 
    # Generate test signal
    afg = AFG31000()
+   scope = MSO44B()
+   
    try:
+       # Configure AFG31000
        afg.set_frequency(1, 5000)      # 5 kHz
        afg.set_waveform_type(1, 'SINusoid')
        afg.set_amplitude(1, 1.0)       # 1 Vpp
@@ -79,36 +94,45 @@ Generate a signal and capture it:
        print("AFG: Generating 5kHz sine wave")
        
        # Capture the signal
-       with MSO44B() as scope:
-           if scope.connect():
-               # Trigger on channel 2 (external trigger)
-               scope.setup_trigger(source_channel=2, level=0.5)
-               
-               results = scope.capture_waveforms(
-                   channels=[1],  # Capture channel 1
-                   filename="sine_wave_test"
-               )
-               
-               if results:
-                   import numpy as np
-                   voltages = results['waveforms']['CH1']
-                   print(f"Captured sine wave: {np.mean(voltages):.3f}V avg")
+       if scope.connect():
+           # Trigger on channel 2 (external trigger)
+           scope.setup_trigger(source_channel=2, level=0.5)
+           
+           results = scope.capture_waveforms(
+               channels=[1],  # Capture channel 1
+               variable_samples=20000,
+               export_data=True,
+               include_metadata=False,  # CSV export
+               filename="sine_wave_test"
+           )
+           
+           if results:
+               voltages = results['waveforms']['CH1']
+               print(f"Captured sine wave: {np.mean(voltages):.3f}V avg")
+               print(f"CSV file: {results.get('csv_file', 'N/A')}")
    
    finally:
        afg.set_output(1, 'OFF')
        afg.close()
+       scope.close()
 
 High-Precision Measurement
 --------------------------
 
-Use binary format for maximum precision:
+Use high resolution mode and binary format for maximum precision:
 
 .. code-block:: python
 
    from MSO44B import MSO44B
 
-   with MSO44B() as scope:
+   scope = MSO44B()
+   try:
        scope.connect()
+       
+       # Enable high resolution mode for 16-bit precision
+       scope.set_high_resolution_mode(True)
+       print(f"Acquisition mode: {scope.get_acquisition_mode()}")
+       
        scope.setup_trigger(source_channel=1, level=0.0)
        
        # Compare ASCII vs binary precision
@@ -125,11 +149,14 @@ Use binary format for maximum precision:
        differences = [abs(a - b) for a, b in zip(ascii_voltages, binary_voltages)]
        max_diff = max(differences)
        print(f"Maximum difference: {max_diff:.2e} V")
+       
+   finally:
+       scope.close()
 
 Custom Data Processing
----------------------
+----------------------
 
-Process waveform data manually:
+Process waveform data manually with metadata:
 
 .. code-block:: python
 
@@ -137,7 +164,8 @@ Process waveform data manually:
    import numpy as np
    import matplotlib.pyplot as plt
 
-   with MSO44B() as scope:
+   scope = MSO44B()
+   try:
        scope.connect()
        scope.setup_trigger(source_channel=1, level=0.0)
        
@@ -149,24 +177,32 @@ Process waveform data manually:
        time_params = scope.get_time_scaling_params()
        time_axis = scope.generate_time_axis(len(voltages), time_params)
        
+       # Get metadata for analysis context
+       metadata = scope.get_scope_metadata(channels=[1], include_global=True)
+       sample_rate = metadata['acquisition']['sample_rate']
+       
        # Custom analysis
-       frequency = 1.0 / (time_axis[-1] - time_axis[0]) * len(voltages)
+       frequency = sample_rate
        rms_voltage = np.sqrt(np.mean(np.array(voltages)**2))
        
-       print(f"Effective sample rate: {frequency:.0f} Hz")
+       print(f"Sample rate: {frequency:,.0f} Hz")
        print(f"RMS voltage: {rms_voltage:.3f} V")
+       print(f"Acquisition mode: {metadata['acquisition']['acquisition_mode']}")
        
-       # Custom plot
+       # Custom plot with metadata
        plt.figure(figsize=(12, 6))
        plt.plot(time_axis * 1e3, voltages)  # Convert to milliseconds
        plt.xlabel('Time (ms)')
        plt.ylabel('Voltage (V)')
-       plt.title(f'Custom Analysis: RMS = {rms_voltage:.3f}V')
+       plt.title(f'Custom Analysis: RMS = {rms_voltage:.3f}V, {frequency/1e6:.0f} MS/s')
        plt.grid(True)
        plt.savefig('custom_analysis.png')
+       
+   finally:
+       scope.close()
 
 Instrument Discovery
--------------------
+--------------------
 
 Find and list available instruments:
 
@@ -184,17 +220,17 @@ Find and list available instruments:
    # Connect to specific instruments
    if afg_instruments:
        afg = AFG31000()  # Auto-connects to first AFG found
-       print(f"Connected to: {afg.device_id()}")
+       print(f"Connected to AFG: {afg.device_id()}")
        afg.close()
    
    if mso_instruments:
        scope = MSO44B()
        if scope.connect():
-           print("Successfully connected to MSO44B")
-           scope.disconnect()
+           print(f"Connected to MSO: {scope.device_id()}")
+           scope.close()
 
 Running the Examples
--------------------
+--------------------
 
 Use the built-in example runner:
 

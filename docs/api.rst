@@ -54,33 +54,38 @@ Communication:
 
 Core Methods:
   * ``__init__(timeout)`` - Initialize oscilloscope wrapper
-  * ``connect(ip_address, auto_discover)`` - Connect to oscilloscope
+  * ``connect(ip_address, auto_discover)`` - Connect to oscilloscope with auto-discovery
   * ``setup_trigger(source_channel, trigger_type, level, slope)`` - Configure trigger
-  * ``disconnect()`` - Close connection
-  * ``__enter__()`` / ``__exit__()`` - Context manager support
+  * ``close()`` - Close connection and cleanup resources
+  * ``device_id()`` - Get device identification string
+
+Acquisition Control:
+  * ``set_high_resolution_mode(enable)`` - Enable/disable 16-bit high resolution mode
+  * ``get_acquisition_mode()`` - Get current acquisition mode (sample, hires, etc.)
 
 Data Acquisition:
-  * ``capture_waveforms(channels, filename, plot, save_csv)`` - Capture and process waveforms
+  * ``capture_waveforms(channels, filename, plot, export_data, include_metadata, variable_samples)`` - Unified capture with flexible export
   * ``read_channel_waveform(channel, use_binary)`` - Read single channel data
   * ``get_waveform_scaling_params(channel)`` - Get voltage scaling parameters
   * ``get_time_scaling_params()`` - Get time base parameters
   * ``convert_raw_to_voltage(raw_data, scaling_params)`` - Convert ADC to voltage
   * ``generate_time_axis(data_length, time_params)`` - Create time axis
 
+Metadata Collection:
+  * ``get_scope_metadata(channels, include_global)`` - Collect comprehensive instrument metadata
+
 Data Export:
   * ``save_csv(waveform_data, filename)`` - Save data to CSV file
   * ``plot_waveforms(waveform_data, channels, filename)`` - Generate plots
 
+Direct SCPI Access:
+  * ``write(command)`` - Send SCPI command
+  * ``query(command)`` - Send command and read response
+
 Utility:
   * ``list_all_instruments()`` - Find all MSO44/MSO46 instruments (static method)
+  * ``_discover_mso44_instruments()`` - Internal auto-discovery method
 
-**MSO44BLegacy Basic Interface:**
-
-  * ``__init__(resource_name, ip_address, serial_port)`` - Initialize basic connection
-  * ``write(command)`` - Send SCPI command
-  * ``query(command)`` - Send command and read response  
-  * ``device_id()`` - Get device identification
-  * ``close()`` - Close connection
 
 Exception Handling
 ------------------
@@ -106,8 +111,10 @@ Example error handling:
        print(f"Parameter error: {e}")
    
    try:
-       with MSO44B() as scope:
-           scope.connect(ip_address="192.168.1.999")  # Invalid IP
+       scope = MSO44B()
+       scope.connect(ip_address="192.168.1.999")  # Invalid IP
+       # ... use scope ...
+       scope.close()
    except (OSError, RuntimeError) as e:
        print(f"Connection error: {e}")
 
@@ -129,13 +136,16 @@ Data Types
 - Trigger levels: ``float`` (Volts)
 - Slopes: ``str`` ('rising' or 'falling')
 - File names: ``str`` (without extension)
+- Variable samples: ``int`` (1000 to 50,000,000 samples)
+- Include metadata: ``bool`` (True for JSON, False for CSV export)
 
 **Return Values:**
 
 - Waveform data: ``list[float]`` (voltage values)
 - Time data: ``numpy.ndarray`` or ``list[float]`` (time values in seconds)
 - Scaling parameters: ``dict`` (calibration constants)
-- Capture results: ``dict`` (waveforms, metadata, filenames)
+- Capture results: ``dict`` (waveforms, metadata, filenames, sample_points)
+- Metadata: ``dict`` (instrument info, acquisition settings, channel configs, trigger params)
 
 Constants
 ---------
@@ -169,6 +179,6 @@ Version Information
    import MSO44B
    import AFG31000
    
-   print("Library version: 1.0.0")
+   print("Library version: 1.1.0")
    print("Supports: AFG31000 series, MSO44B/MSO46")
-   print("Dependencies: pyvisa, numpy, matplotlib")
+   print("Dependencies: pyvisa, numpy, matplotlib, pyMSO4")

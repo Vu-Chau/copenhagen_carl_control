@@ -10,8 +10,8 @@ Basic Usage
 
    from AFG31000 import AFG31000
 
-   # Auto-discover and connect
-   afg = AFG31000()
+   # Consistent usage pattern with MSO44B
+   afg = AFG31000()  # Auto-discover and connect
    
    # Configure channel 1
    afg.set_frequency(1, 1000)        # 1 kHz
@@ -20,23 +20,29 @@ Basic Usage
    afg.set_offset(1, 0.0)            # 0V offset
    afg.set_output(1, 'ON')           # Enable output
    
-   # Clean up
+   # Explicit cleanup (consistent pattern)
    afg.close()
 
 Key Features
 ------------
 
 **Auto-Discovery**
-   Automatically finds connected AFG instruments via VISA.
+   Automatically finds connected AFG instruments via VISA scanning.
 
 **Dual Channel Control**
-   Control both channels independently with different waveforms.
+   Control both channels independently with different waveforms and settings.
 
 **Multiple Waveforms**
-   Supports sine, square, pulse, ramp, noise, and more.
+   Supports sine, square, pulse, ramp, noise, and 12 total waveform types.
 
-**Load Impedance**
-   Set output load impedance (50Ω, 75Ω, high-Z, etc.).
+**Load Impedance Control**
+   Set output load impedance (50Ω, 75Ω, high-Z, infinite, etc.).
+
+**Direct SCPI Access**
+   ``write()``, ``query()``, and ``device_id()`` methods for advanced control alongside high-level methods.
+
+**Consistent API**
+   Unified usage pattern with MSO44B class (direct instantiation + explicit ``close()``).
 
 Common Methods
 --------------
@@ -58,12 +64,22 @@ Common Methods
    afg.set_load(channel, 50)        # 50 ohm load
    afg.set_phase(channel, 90, 'DEG') # 90 degree phase
 
+**Direct SCPI Commands:**
+
+.. code-block:: python
+
+   # Direct instrument control
+   afg.write('OUTP1:STAT ON')                    # Direct SCPI command
+   output_state = afg.query('OUTP1:STAT?')       # Query output state
+   device_info = afg.device_id()                 # Get instrument ID
+
 **Utility:**
 
 .. code-block:: python
 
-   device_id = afg.device_id()              # Get device info
+   # Discovery and identification
    instruments = AFG31000.list_all_instruments()  # List all instruments
+   device_id = afg.device_id()                    # Get device info
 
 Available Waveforms
 -------------------
