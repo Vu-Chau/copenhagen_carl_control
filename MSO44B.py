@@ -230,16 +230,29 @@ class MSO44B:
         """
         if not self.connected:
             raise RuntimeError("Not connected to scope")
-            
-        time_params = {
-            'x_incr': float(self.scope.sc.query('WFMOutpre:XINcr?').strip()),
-            'x_zero': float(self.scope.sc.query('WFMOutpre:XZEro?').strip()),
-            'pt_off': float(self.scope.sc.query('WFMOutpre:PT_Off?').strip()),
-            'sample_rate': self.scope.acq.horiz_sample_rate,
-            'horiz_scale': self.scope.acq.horiz_scale
-        }
         
-        return time_params
+        try:
+            # Store original timeout and increase it for these queries
+            original_timeout = self.scope.sc.timeout
+            self.scope.sc.timeout = 10000  # 10 second timeout
+            
+            time_params = {
+                'x_incr': float(self.scope.sc.query('WFMOutpre:XINcr?').strip()),
+                'x_zero': float(self.scope.sc.query('WFMOutpre:XZEro?').strip()),
+                'pt_off': float(self.scope.sc.query('WFMOutpre:PT_Off?').strip()),
+                'sample_rate': self.scope.acq.horiz_sample_rate,
+                'horiz_scale': self.scope.acq.horiz_scale
+            }
+            
+            # Restore original timeout
+            self.scope.sc.timeout = original_timeout
+            return time_params
+            
+        except Exception as e:
+            # Restore original timeout on error
+            if 'original_timeout' in locals():
+                self.scope.sc.timeout = original_timeout
+            raise RuntimeError(f"Could not get time scaling parameters: {e}")
     
     def convert_raw_to_voltage(self, raw_data, scaling_params):
         """
@@ -351,7 +364,11 @@ class MSO44B:
             # Set record length for variable samples
             try:
                 self.scope.acq.horiz_record_length = variable_samples
-                print(f"Set record length to {variable_samples} samples")
+                # Verify the setting was applied
+                actual_length = self.scope.acq.horiz_record_length
+                print(f"Set record length to {variable_samples} samples (actual: {actual_length})")
+                if actual_length != variable_samples:
+                    print(f"Warning: Scope set record length to {actual_length} instead of {variable_samples}")
             except Exception as e:
                 print(f"Warning: Could not set record length: {e}")
             
@@ -519,6 +536,10 @@ class MSO44B:
             if time_data is None:
                 print("Warning: No time data available for plotting")
                 return None
+            
+            # Convert to numpy array if it's a list (happens when include_metadata=True)
+            if isinstance(time_data, list):
+                time_data = np.array(time_data)
             
             colors = ['blue', 'red', 'green', 'orange']
             
@@ -697,22 +718,38 @@ class MSO44B:
         except Exception as e:
             return {'error': str(e)}
     
-    def set_channel_bandwidth(self, channel, bandwidth_limit):
+    def set_bandwidth(self, bandwidth_limit, channel=None):
         """
-        Set bandwidth limit for a specific channel.
+        Set bandwidth limit for specific channel(s) or all channels.
         
         Args:
-            channel (int): Channel number (1-4)
             bandwidth_limit (str or float): Bandwidth limit in Hz, or 'FULL' for no limit
-                                          Common values: 'FULL', 20e6, 200e6, etc.
+                                          Common values: 'FULL', 20e6, 250e6
+            channel (int or None): Channel number (1-4), or None for all channels
         
         Returns:
-            bool: True if successful
+            bool or dict: True if successful for single channel, dict for all channels
         """
         if not self.connected:
             print("Error: Not connected to scope. Call connect() first.")
             return False
         
+        # Set all channels if channel is None
+        if channel is None:
+            print(f"Setting bandwidth limit for all channels to: {bandwidth_limit}")
+            results = {}
+            for ch in range(1, self.scope.ch_a_num + 1):
+                results[f'CH{ch}'] = self._set_single_channel_bandwidth(ch, bandwidth_limit)
+            print("All channels bandwidth setting complete.")
+            return results
+        else:
+            # Set specific channel
+            return self._set_single_channel_bandwidth(channel, bandwidth_limit)
+    
+    def _set_single_channel_bandwidth(self, channel, bandwidth_limit):
+        """
+        Internal helper to set bandwidth for a single channel.
+        """
         if channel < 1 or channel > self.scope.ch_a_num:
             print(f"Error: Invalid channel {channel}. Must be 1-{self.scope.ch_a_num}")
             return False
@@ -720,12 +757,14 @@ class MSO44B:
         try:
             if isinstance(bandwidth_limit, str) and bandwidth_limit.upper() == 'FULL':
                 self.scope.sc.write(f'CH{channel}:BANdwidth FULL')
-                print(f"CH{channel} bandwidth limit set to FULL (no limit)")
             else:
                 # Convert to float if it's a number
                 bw_value = float(bandwidth_limit)
                 self.scope.sc.write(f'CH{channel}:BANdwidth {bw_value}')
-                print(f"CH{channel} bandwidth limit set to {bw_value:,.0f} Hz")
+            
+            # Query the actual setting to confirm what was set
+            actual_bw = self.scope.sc.query(f'CH{channel}:BANdwidth?').strip()
+            print(f"CH{channel} bandwidth limit set to: {actual_bw}")
             
             return True
             
@@ -733,7 +772,7 @@ class MSO44B:
             print(f"Failed to set bandwidth for CH{channel}: {e}")
             return False
     
-    def get_channel_bandwidth(self, channel):
+    def get_bandwidth(self, channel):
         """
         Get current bandwidth limit for a specific channel.
         
@@ -754,21 +793,6 @@ class MSO44B:
             return bandwidth
         except Exception as e:
             raise RuntimeError(f"Failed to get bandwidth for CH{channel}: {e}")
-    
-    def set_all_channels_bandwidth(self, bandwidth_limit):
-        """
-        Set bandwidth limit for all channels.
-        
-        Args:
-            bandwidth_limit (str or float): Bandwidth limit in Hz, or 'FULL' for no limit
-        
-        Returns:
-            dict: Dictionary with channel results
-        """
-        results = {}
-        for ch in range(1, self.scope.ch_a_num + 1):
-            results[f'CH{ch}'] = self.set_channel_bandwidth(ch, bandwidth_limit)
-        return results
     
     def get_scope_metadata(self, channels=None, include_global=True):
         """
